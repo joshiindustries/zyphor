@@ -1,0 +1,143 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id             String      @id @default(uuid())
+  email          String      @unique
+  password_hash  String?
+  name           String?
+  avatar         String?
+  dob            String?
+  created_at     DateTime    @default(now())
+
+  links          Link[]
+  accounts       Account[] // For social login
+  saved_links    SavedLink[]
+  sessions       Session[] // Custom session table
+  download_logs  DownloadLog[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(uuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id         String   @id @default(uuid())
+  token      String   @unique
+  user_id    String
+  expires_at DateTime
+
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model Link {
+  id                String      @id
+  user_id           String
+  expires_at        DateTime    
+  max_downloads     Int         @default(0)
+  current_downloads Int         @default(0)
+  allow_save        Int         @default(1)
+  auth_required     Int         @default(0)
+  created_at        DateTime    @default(now())
+
+  user              User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  files             File[]
+  saved_by          SavedLink[]
+  download_logs     DownloadLog[]
+
+  @@map("links")
+}
+
+model SavedLink {
+  id        String   @id @default(uuid())
+  user_id   String
+  link_id   String
+  saved_at  DateTime @default(now())
+
+  user      User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  link      Link     @relation(fields: [link_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, link_id])
+  @@map("saved_links")
+}
+
+model File {
+  id            String   @id @default(uuid())
+  link_id       String
+  original_name String
+  size          Int
+  storage_path  String
+  salt          String   @db.Text
+  iv            String   @db.Text
+
+  link          Link     @relation(fields: [link_id], references: [id], onDelete: Cascade)
+  download_logs DownloadLog[]
+
+  @@map("files")
+}
+
+model DownloadLog {
+  id            String   @id @default(uuid())
+  link_id       String
+  file_id       String
+  user_id       String
+  ip_address    String?
+  downloaded_at DateTime @default(now())
+
+  link          Link     @relation(fields: [link_id], references: [id], onDelete: Cascade)
+  file          File     @relation(fields: [file_id], references: [id], onDelete: Cascade)
+  user          User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([link_id, downloaded_at])
+  @@index([user_id, downloaded_at])
+  @@map("download_logs")
+}
+
+model Signal {
+  id         String   @id @default(uuid())
+  channel_id String
+  sender     String
+  type       String
+  data       String   @db.Text
+  timestamp  BigInt
+  created_at DateTime @default(now())
+
+  @@index([channel_id, timestamp])
+  @@map("signals")
+}
+
+model RateLimit {
+  id         String   @id @default(uuid())
+  identifier String
+  action     String
+  expires_at DateTime
+  created_at DateTime @default(now())
+
+  @@index([identifier, action])
+  @@map("rate_limits")
+}
