@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { Shield, Zap, Download, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { withCsrfHeaders } from "@/lib/csrf-client";
 
 export default function P2PReceiver() {
   const params = useParams();
@@ -76,7 +77,7 @@ export default function P2PReceiver() {
       if (event.candidate) {
         await fetch("/api/webrtc/signal", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: withCsrfHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify({
             channelId,
             sender: "client",
@@ -112,7 +113,7 @@ export default function P2PReceiver() {
                 // Send Answer
                 await fetch("/api/webrtc/signal", {
                   method: "POST",
-                  headers: { "Content-Type": "application/json" },
+                  headers: withCsrfHeaders({ "Content-Type": "application/json" }),
                   body: JSON.stringify({
                     channelId,
                     sender: "client",

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { withCsrfHeaders } from "@/lib/csrf-client";
 
 export default function ProfileForm({ user }: { user: any }) {
   const [name, setName] = useState(user.name || "");
@@ -40,7 +41,7 @@ export default function ProfileForm({ user }: { user: any }) {
 
       const res = await fetch("/api/profile/update", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: withCsrfHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify(payload)
       });
 

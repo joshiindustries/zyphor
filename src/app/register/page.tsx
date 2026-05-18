@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Turnstile } from "@marsidev/react-turnstile";
+import { withCsrfHeaders } from "@/lib/csrf-client";
 
 const TURNSTILE_ENABLED =
   process.env.NEXT_PUBLIC_TURNSTILE_ENABLED === "true" ||
@@ -27,7 +28,7 @@ export default function RegisterPage() {
     try {
       const res = await fetch("/api/auth/register", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: withCsrfHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
           name,
           email,

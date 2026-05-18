@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Lock, Shield, Zap, UploadCloud, CheckCircle2, Copy } from "lucide-react";
 import { encryptFile } from "@/lib/crypto";
 import { generateMemorablePassphrase } from "@/lib/words";
+import { withCsrfHeaders } from "@/lib/csrf-client";
 import SiteFooter from "@/components/SiteFooter";
 
 // Define the available password modes
@@ -85,7 +86,7 @@ export default function Home() {
       if (event.candidate) {
         await fetch("/api/webrtc/signal", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: withCsrfHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify({
             channelId,
             sender: "host",
@@ -104,7 +105,7 @@ export default function Home() {
       // Send offer to signaling server
       await fetch("/api/webrtc/signal", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: withCsrfHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
           channelId,
           sender: "host",
@@ -285,6 +286,7 @@ export default function Home() {
       // Upload to server
       const res = await fetch("/api/upload", {
         method: "POST",
+        headers: withCsrfHeaders(),
         body: formData,
       });
 

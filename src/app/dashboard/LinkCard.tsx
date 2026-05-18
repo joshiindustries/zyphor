@@ -3,11 +3,13 @@
 import { useState, useEffect } from "react";
 import { Lock, Trash2, Edit2, Check, X, Key } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { withCsrfHeaders } from "@/lib/csrf-client";
 
 export default function LinkCard({ link }: { link: any }) {
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState("");
 
   const [maxDownloads, setMaxDownloads] = useState<number>(link.max_downloads);
@@ -56,9 +58,9 @@ export default function LinkCard({ link }: { link: any }) {
 
       const response = await fetch("/api/links/edit", {
         method: "PATCH",
-        headers: {
+        headers: withCsrfHeaders({
           "Content-Type": "application/json",
-        },
+        }),
         body: JSON.stringify({
           id: link.id,
           maxDownloads,
@@ -79,6 +81,34 @@ export default function LinkCard({ link }: { link: any }) {
       setError(err.message || "An error occurred");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (isDeleting) return;
+    setIsDeleting(true);
+    setError("");
+
+    try {
+      const response = await fetch("/api/links/delete", {
+        method: "POST",
+        headers: withCsrfHeaders({
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        }),
+        body: JSON.stringify({ id: link.id }),
+      });
+
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || payload?.error) {
+        throw new Error(payload?.error || "Failed to delete transfer");
+      }
+
+      router.refresh();
+    } catch (err: any) {
+      setError(err.message || "Failed to delete transfer");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -212,17 +242,16 @@ export default function LinkCard({ link }: { link: any }) {
             >
               <Edit2 size={16} style={{ color: "var(--accent-blue)" }} />
             </button>
-            <form action="/api/links/delete" method="POST" style={{ display: "flex" }}>
-              <input type="hidden" name="id" value={link.id} />
-              <button
-                type="submit"
-                className="btn btn-secondary"
-                style={{ height: "100%", padding: "0.5rem", color: "#ef4444", borderColor: "rgba(239, 68, 68, 0.3)", display: "flex", alignItems: "center", justifyContent: "center" }}
-                title="Delete Transfer"
-              >
-                <Trash2 size={16} />
-              </button>
-            </form>
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="btn btn-secondary"
+              style={{ height: "100%", padding: "0.5rem", color: "#ef4444", borderColor: "rgba(239, 68, 68, 0.3)", display: "flex", alignItems: "center", justifyContent: "center" }}
+              title="Delete Transfer"
+            >
+              {isDeleting ? "..." : <Trash2 size={16} />}
+            </button>
           </>
         )}
       </div>

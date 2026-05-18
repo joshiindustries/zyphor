@@ -6,6 +6,7 @@ import { Lock, Download, ShieldCheck, AlertCircle } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { withCsrfHeaders } from "@/lib/csrf-client";
 
 export default function DownloadPage({ params }: { params: { id: string } }) {
   const [password, setPassword] = useState("");
@@ -25,7 +26,7 @@ export default function DownloadPage({ params }: { params: { id: string } }) {
     if (status === "authenticated" && searchParams.get("save") === "true" && !saved) {
       fetch("/api/links/save", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: withCsrfHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ linkId: params.id })
       }).then(res => res.json()).then(data => {
         if (data.success) {
@@ -185,7 +186,7 @@ export default function DownloadPage({ params }: { params: { id: string } }) {
               onClick={() => {
                 fetch("/api/links/save", {
                   method: "POST",
-                  headers: { "Content-Type": "application/json" },
+                  headers: withCsrfHeaders({ "Content-Type": "application/json" }),
                   body: JSON.stringify({ linkId: params.id })
                 }).then(res => res.json()).then(data => {
                   if (data.success) {

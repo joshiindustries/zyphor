@@ -7,26 +7,44 @@ import { isPrismaDatabaseConnectivityError } from '@/lib/prisma-errors';
 import { deleteSupabaseObject, isSupabaseStorageError } from '@/lib/supabase-storage';
 
 export async function POST(request: NextRequest) {
+  const contentType = request.headers.get('content-type') || '';
+  const wantsJson =
+    contentType.includes('application/json') ||
+    (request.headers.get('accept') || '').includes('application/json');
+
+  const respond = (status: number, body: Record<string, unknown>, redirectPath = '/dashboard') => {
+    if (wantsJson) {
+      return NextResponse.json(body, { status });
+    }
+    return NextResponse.redirect(new URL(redirectPath, request.url), 303);
+  };
+
   try {
     if (!isSameOrigin(request)) {
-      return NextResponse.json({ error: 'CSRF attempt blocked' }, { status: 403 });
+      return respond(403, { error: 'CSRF attempt blocked' });
     }
 
     const user = await getUser();
     if (!user) {
-      return NextResponse.redirect(new URL('/login', request.url), 303);
+      return respond(401, { error: 'Unauthorized' }, '/login');
     }
 
     const allowed = await checkRateLimit(`${getClientIp(request)}:${user.id}`, 'delete_link', 30, 5);
     if (!allowed) {
-      return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
+      return respond(429, { error: 'Rate limit exceeded' });
     }
 
-    const formData = await request.formData();
-    const linkId = formData.get('id') as string;
+    let linkId = '';
+    if (contentType.includes('application/json')) {
+      const payload = await request.json().catch(() => ({}));
+      linkId = typeof payload?.id === 'string' ? payload.id : '';
+    } else {
+      const formData = await request.formData();
+      linkId = String(formData.get('id') || '');
+    }
 
     if (!linkId || !isValidLinkId(linkId)) {
-      return NextResponse.redirect(new URL('/dashboard', request.url), 303);
+      return respond(400, { error: 'Invalid link id' });
     }
 
     // Verify ownership
@@ -36,7 +54,7 @@ export async function POST(request: NextRequest) {
     });
     
     if (!link || link.user_id !== user.id) {
-      return NextResponse.redirect(new URL('/dashboard', request.url), 303);
+      return respond(403, { error: 'Forbidden' });
     }
 
     // Delete files from file system transactionally
@@ -54,7 +72,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!allDeleted) {
-      return NextResponse.json({ error: 'Failed to sync storage deletion, aborting database removal' }, { status: 500 });
+      return respond(500, { error: 'Failed to sync storage deletion, aborting database removal' });
     }
 
     // Delete link (Cascading delete will remove files and savedLinks)
@@ -62,13 +80,15 @@ export async function POST(request: NextRequest) {
       where: { id: linkId }
     });
 
-    // Redirect back to dashboard
-    return NextResponse.redirect(new URL('/dashboard', request.url), 303);
+    return respond(200, { success: true });
   } catch (error) {
     console.error('Delete error:', error);
     if (isPrismaDatabaseConnectivityError(error)) {
-      return NextResponse.redirect(new URL('/dashboard?error=db_unavailable', request.url), 303);
+      return respond(503, { error: 'Database unavailable' }, '/dashboard?error=db_unavailable');
     }
-    return NextResponse.redirect(new URL('/dashboard', request.url), 303);
+    if (isSupabaseStorageError(error)) {
+      return respond(error.status || 500, { error: error.message });
+    }
+    return respond(500, { error: 'Internal server error' });
   }
 }
