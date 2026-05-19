@@ -75,12 +75,40 @@ function shouldDisableTlsVerification(connectionString: string): boolean {
   }
 }
 
+function normalizeConnectionStringForPg(
+  connectionString: string,
+  disableTlsVerification: boolean
+): string {
+  try {
+    const url = new URL(connectionString);
+
+    // When ssl config is passed explicitly to pg, keep SSL query params out of URL
+    // to avoid pg overriding config values from connection string.
+    url.searchParams.delete("sslmode");
+    url.searchParams.delete("sslrootcert");
+    url.searchParams.delete("sslcert");
+    url.searchParams.delete("sslkey");
+
+    if (!disableTlsVerification) {
+      url.searchParams.set("sslmode", "require");
+    }
+
+    return url.toString();
+  } catch {
+    return connectionString;
+  }
+}
+
 function createPrismaClient() {
   const connectionString = getConnectionString();
   const disableTlsVerification = shouldDisableTlsVerification(connectionString);
+  const normalizedConnectionString = normalizeConnectionStringForPg(
+    connectionString,
+    disableTlsVerification
+  );
 
   const adapter = new PrismaPg({
-    connectionString,
+    connectionString: normalizedConnectionString,
     ...(disableTlsVerification ? { ssl: { rejectUnauthorized: false } } : {}),
   });
 
