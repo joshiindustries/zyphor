@@ -317,12 +317,24 @@ export const authOptions: AuthOptions = {
   secret: process.env.NEXTAUTH_SECRET as string
 };
 
+type DynamicServerUsageError = {
+  digest?: string;
+};
+
+function isDynamicServerUsageError(error: unknown): error is DynamicServerUsageError {
+  if (!error || typeof error !== "object") return false;
+  return (error as DynamicServerUsageError).digest === "DYNAMIC_SERVER_USAGE";
+}
+
 export async function getUser() {
   try {
     const session = await getServerSession(authOptions);
     if (!session || !session.user) return null;
     return session.user as any;
   } catch (error) {
+    if (isDynamicServerUsageError(error)) {
+      throw error;
+    }
     console.error('Auth error:', error);
     return null;
   }

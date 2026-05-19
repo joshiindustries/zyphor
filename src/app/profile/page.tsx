@@ -6,6 +6,8 @@ import { prisma } from "@/lib/db";
 import ProfileForm from "./ProfileForm";
 import LinkAccountButton from "@/components/LinkAccountButton";
 
+export const dynamic = "force-dynamic";
+
 export default async function ProfilePage() {
   const sessionUser = await getUser();
 
