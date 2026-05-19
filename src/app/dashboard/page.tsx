@@ -8,6 +8,8 @@ import LogoutButton from "@/components/LogoutButton";
 import UserAvatar from "@/components/UserAvatar";
 import SiteFooter from "@/components/SiteFooter";
 
+export const dynamic = "force-dynamic";
+
 type DashboardLinkBase = {
   id: string;
   current_downloads: number;
