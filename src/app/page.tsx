@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Lock, Shield, Zap, UploadCloud, CheckCircle2, Copy } from "lucide-react";
+import { Lock, Shield, Zap, UploadCloud, CheckCircle2, Copy, Share2, Mail, MessageCircle, Send } from "lucide-react";
 import { encryptFile } from "@/lib/crypto";
 import { generateMemorablePassphrase } from "@/lib/words";
 import { withCsrfHeaders } from "@/lib/csrf-client";
@@ -11,6 +11,16 @@ import SiteFooter from "@/components/SiteFooter";
 
 // Define the available password modes
 type PasswordMode = "auto" | "random" | "memorable" | "custom" | "webrtc";
+type PreviewKind = "image" | "video" | "audio" | "pdf";
+
+function getPreviewKind(file: File): PreviewKind | null {
+  const mime = file.type || "";
+  if (mime.startsWith("image/")) return "image";
+  if (mime.startsWith("video/")) return "video";
+  if (mime.startsWith("audio/")) return "audio";
+  if (mime === "application/pdf") return "pdf";
+  return null;
+}
 
 export default function Home() {
   const [files, setFiles] = useState<File[]>([]);
@@ -19,6 +29,8 @@ export default function Home() {
   const [progress, setProgress] = useState(0);
   const [shareLink, setShareLink] = useState("");
   const [generatedPassword, setGeneratedPassword] = useState("");
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedShareMessage, setCopiedShareMessage] = useState(false);
   const [isOneTime, setIsOneTime] = useState(false);
   const [allowSave, setAllowSave] = useState(true);
   const [authRequired, setAuthRequired] = useState(false);
@@ -35,6 +47,37 @@ export default function Home() {
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const dataChannelRef = useRef<RTCDataChannel | null>(null);
   const router = useRouter();
+
+  const previewableFiles = useMemo(
+    () =>
+      files
+        .map((file) => {
+          const kind = getPreviewKind(file);
+          return kind ? { file, kind } : null;
+        })
+        .filter((value): value is { file: File; kind: PreviewKind } => Boolean(value)),
+    [files]
+  );
+  const [previewItems, setPreviewItems] = useState<Array<{ file: File; kind: PreviewKind; url: string }>>([]);
+  const hasNonPreviewableFiles = files.length > previewableFiles.length;
+
+  useEffect(() => {
+    if (previewableFiles.length === 0) {
+      setPreviewItems([]);
+      return;
+    }
+
+    const items = previewableFiles.map(({ file, kind }) => ({
+      file,
+      kind,
+      url: URL.createObjectURL(file),
+    }));
+    setPreviewItems(items);
+
+    return () => {
+      items.forEach((item) => URL.revokeObjectURL(item.url));
+    };
+  }, [previewableFiles]);
 
   useEffect(() => {
     fetch('/api/auth/me')
@@ -324,13 +367,54 @@ export default function Home() {
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(shareLink);
-    alert("Copied to clipboard!");
+    setCopiedLink(true);
+    window.setTimeout(() => setCopiedLink(false), 1800);
   };
+
+  const copyShareMessage = () => {
+    navigator.clipboard.writeText(shareText);
+    setCopiedShareMessage(true);
+    window.setTimeout(() => setCopiedShareMessage(false), 1800);
+  };
+
+  const shareNatively = async () => {
+    if (!shareLink) return;
+    if (typeof navigator === "undefined" || typeof navigator.share !== "function") {
+      alert("Native sharing is not supported in this browser.");
+      return;
+    }
+
+    try {
+      await navigator.share({
+        title: "Secure file link",
+        text: "Secure file shared via Zyphor. Use Zyphor for secure and easy sharing.",
+        url: shareLink,
+      });
+    } catch {
+      // User cancelled or platform blocked share
+    }
+  };
+
+  const appOrigin = typeof window !== "undefined" ? window.location.origin : "";
+  const promoLine = "Use Zyphor for secure and easy sharing.";
+  const encodedLink = encodeURIComponent(shareLink);
+  const shareText = `Secure file link: ${shareLink}\n\n${promoLine}\n${appOrigin}`;
+  const encodedText = encodeURIComponent(shareText);
+  const emailSubject = encodeURIComponent("Secure file shared via Zyphor");
+  const emailBody = encodeURIComponent(`Hi,\n\nHere is the secure file link:\n${shareLink}\n\n${promoLine}\n${appOrigin}\n\nIf needed, I will share the password separately.`);
+  const socialTargets = [
+    { label: "WhatsApp", href: `https://wa.me/?text=${encodedText}`, icon: MessageCircle },
+    { label: "Telegram", href: `https://t.me/share/url?url=${encodedLink}&text=${encodeURIComponent(`Secure file link. ${promoLine}`)}`, icon: Send },
+    { label: "X", href: `https://twitter.com/intent/tweet?text=${encodedText}`, icon: Share2 },
+    { label: "Facebook", href: `https://www.facebook.com/sharer/sharer.php?u=${encodedLink}`, icon: Share2 },
+  ];
 
   // Helper to reset state
   const resetShare = () => {
     setShareLink(""); 
     setGeneratedPassword(""); 
+    setCopiedLink(false);
+    setCopiedShareMessage(false);
     setFiles([]); 
     setPassword(""); 
     setIsOneTime(false); 
@@ -399,6 +483,76 @@ export default function Home() {
                 <input readOnly value={shareLink} className="input-field" style={{ flex: 1, color: "var(--accent-blue)" }} />
                 <button onClick={copyToClipboard} className="btn btn-primary"><Copy size={18} /></button>
               </div>
+              <p style={{ margin: 0, fontSize: "0.8rem", color: copiedLink ? "#10b981" : "var(--text-secondary)" }}>
+                {copiedLink ? "Link copied. Ready to share." : "Copy the link or share directly using an app below."}
+              </p>
+              <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--text-secondary)" }}>
+                Share message includes: "Use Zyphor for secure and easy sharing."
+              </p>
+              <button onClick={copyShareMessage} className="btn btn-secondary" style={{ width: "100%", border: "1px solid var(--glass-border)" }}>
+                {copiedShareMessage ? "Share message copied" : "Copy Share Message"}
+              </button>
+
+              <div style={{ width: "100%", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: "0.6rem" }}>
+                <button onClick={shareNatively} className="btn btn-secondary" style={{ border: "1px solid var(--glass-border)" }}>
+                  <Share2 size={16} /> Share
+                </button>
+                <a href={`mailto:?subject=${emailSubject}&body=${emailBody}`} className="btn btn-secondary" style={{ border: "1px solid var(--glass-border)", textDecoration: "none" }}>
+                  <Mail size={16} /> Email
+                </a>
+                {socialTargets.map((target) => {
+                  const Icon = target.icon;
+                  return (
+                    <a
+                      key={target.label}
+                      href={target.href}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="btn btn-secondary"
+                      style={{ border: "1px solid var(--glass-border)", textDecoration: "none" }}
+                    >
+                      <Icon size={16} /> {target.label}
+                    </a>
+                  );
+                })}
+              </div>
+
+              {previewItems.length > 0 && !isWebrtcConnecting && (
+                <div style={{ width: "100%", textAlign: "left", background: "rgba(0,0,0,0.2)", border: "1px solid var(--glass-border)", padding: "1rem", borderRadius: "var(--radius-sm)" }}>
+                  <p style={{ fontSize: "0.9rem", color: "var(--text-secondary)", marginBottom: "0.6rem" }}>
+                    File Preview
+                  </p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                    {previewItems.map((item) => (
+                      <div key={`${item.file.name}-${item.file.size}-${item.file.lastModified}`} style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                        <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--text-secondary)" }}>{item.file.name}</p>
+                        {item.kind === "image" && (
+                          <img src={item.url} alt={item.file.name} style={{ width: "100%", maxHeight: "280px", objectFit: "contain", borderRadius: "8px" }} />
+                        )}
+                        {item.kind === "video" && (
+                          <video src={item.url} controls style={{ width: "100%", maxHeight: "280px", borderRadius: "8px" }} />
+                        )}
+                        {item.kind === "audio" && (
+                          <audio src={item.url} controls style={{ width: "100%" }} />
+                        )}
+                        {item.kind === "pdf" && (
+                          <iframe title={`PDF Preview ${item.file.name}`} src={item.url} style={{ width: "100%", height: "280px", border: "none", borderRadius: "8px" }} />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {previewItems.length === 0 && files.length > 0 && !isWebrtcConnecting && (
+                <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--text-secondary)" }}>
+                  Preview is not available for this file type.
+                </p>
+              )}
+              {previewItems.length > 0 && hasNonPreviewableFiles && !isWebrtcConnecting && (
+                <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--text-secondary)" }}>
+                  Some selected files do not support preview.
+                </p>
+              )}
 
               {generatedPassword && (
                 <div style={{ width: "100%", textAlign: "left", background: "rgba(59, 130, 246, 0.1)", border: "1px solid var(--accent-blue)", padding: "1rem", borderRadius: "var(--radius-sm)" }}>
