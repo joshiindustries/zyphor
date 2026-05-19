@@ -114,7 +114,7 @@ export async function GET(
           user_id: user.id,
           ip_address: getClientIp(request),
         },
-      }).catch((logError) => {
+      }).catch((logError: unknown) => {
         console.warn('Failed to persist download log:', logError);
       });
     }
