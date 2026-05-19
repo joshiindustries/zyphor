@@ -6,8 +6,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Turnstile } from "@marsidev/react-turnstile";
 
+const TURNSTILE_FLAG = process.env.NEXT_PUBLIC_TURNSTILE_ENABLED?.toLowerCase();
 const TURNSTILE_ENABLED =
-  process.env.NEXT_PUBLIC_TURNSTILE_ENABLED === "true" ||
+  TURNSTILE_FLAG === "true" ? true :
+  TURNSTILE_FLAG === "false" ? false :
   process.env.NODE_ENV === "production";
 
 function LoginPageContent() {

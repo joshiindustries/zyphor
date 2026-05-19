@@ -7,8 +7,10 @@ import { signIn } from "next-auth/react";
 import { Turnstile } from "@marsidev/react-turnstile";
 import { withCsrfHeaders } from "@/lib/csrf-client";
 
+const TURNSTILE_FLAG = process.env.NEXT_PUBLIC_TURNSTILE_ENABLED?.toLowerCase();
 const TURNSTILE_ENABLED =
-  process.env.NEXT_PUBLIC_TURNSTILE_ENABLED === "true" ||
+  TURNSTILE_FLAG === "true" ? true :
+  TURNSTILE_FLAG === "false" ? false :
   process.env.NODE_ENV === "production";
 
 export default function RegisterPage() {
