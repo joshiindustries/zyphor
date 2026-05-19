@@ -3,6 +3,15 @@ import { prisma } from "@/lib/db";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getClientIp, isSameOrigin, isValidChannelId, isValidSignalName, noStoreJson } from "@/lib/security";
 
+type SignalRow = {
+  id: string;
+  channel_id: string;
+  sender: string;
+  type: string;
+  data: string;
+  timestamp: bigint;
+};
+
 const ALLOWED_SIGNAL_SENDERS = new Set(["host", "client"]);
 const ALLOWED_SIGNAL_TYPES = new Set(["offer", "answer", "candidate"]);
 const MAX_SIGNAL_DATA_BYTES = 200_000;
@@ -125,9 +134,9 @@ export async function GET(req: NextRequest) {
       },
       orderBy: { timestamp: 'asc' },
       take: 250,
-    });
+    }) as SignalRow[];
 
-    const parsedSignals = signals.map(signal => ({
+    const parsedSignals = signals.map((signal: SignalRow) => ({
       id: signal.timestamp.toString(),
       channel_id: signal.channel_id,
       sender: signal.sender,
