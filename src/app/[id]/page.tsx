@@ -4,11 +4,11 @@ import { useEffect, useState } from "react";
 import { decryptData } from "@/lib/crypto";
 import { Lock, Download, ShieldCheck, AlertCircle } from "lucide-react";
 import { useSession } from "next-auth/react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { withCsrfHeaders } from "@/lib/csrf-client";
 
-export default function DownloadPage({ params }: { params: { id: string } }) {
+export default function DownloadPage() {
   const [password, setPassword] = useState("");
   const [files, setFiles] = useState<any[]>([]);
   const [error, setError] = useState("");
@@ -18,24 +18,27 @@ export default function DownloadPage({ params }: { params: { id: string } }) {
   const [requiresAuth, setRequiresAuth] = useState(false);
   
   const { data: session, status } = useSession();
+  const routeParams = useParams<{ id: string }>();
+  const linkId = (Array.isArray(routeParams?.id) ? routeParams.id[0] : routeParams?.id) ?? "";
   const searchParams = useSearchParams();
   const router = useRouter();
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
+    if (!linkId) return;
     if (status === "authenticated" && searchParams.get("save") === "true" && !saved) {
       fetch("/api/links/save", {
         method: "POST",
         headers: withCsrfHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ linkId: params.id })
+        body: JSON.stringify({ linkId })
       }).then(res => res.json()).then(data => {
         if (data.success) {
           setSaved(true);
-          router.replace(`/${params.id}`); // Clean URL
+          router.replace(`/${linkId}`); // Clean URL
         }
       });
     }
-  }, [status, searchParams, params.id, saved, router]);
+  }, [status, searchParams, linkId, saved, router]);
 
   useEffect(() => {
     // Check for password in URL hash
@@ -46,8 +49,13 @@ export default function DownloadPage({ params }: { params: { id: string } }) {
   }, []);
 
   useEffect(() => {
+    if (!linkId) {
+      setError("Invalid link.");
+      setLoading(false);
+      return;
+    }
     // Fetch link metadata
-    fetch(`/api/download/${params.id}`)
+    fetch(`/api/download/${linkId}`)
       .then(async (res) => ({ status: res.status, data: await res.json() }))
       .then(({ status, data }) => {
         if (status === 401 && data?.authRequired) {
@@ -71,9 +79,13 @@ export default function DownloadPage({ params }: { params: { id: string } }) {
         setError("Failed to fetch link details.");
         setLoading(false);
       });
-  }, [params.id, status]);
+  }, [linkId, status]);
 
   const handleDownload = async (file: any) => {
+    if (!linkId) {
+      setError("Invalid link.");
+      return;
+    }
     if (!password) {
       setError("Password is required to decrypt the file.");
       return;
@@ -84,7 +96,7 @@ export default function DownloadPage({ params }: { params: { id: string } }) {
     
     try {
       // Fetch encrypted file stream
-      const response = await fetch(`/api/download/${params.id}?fileId=${file.id}`);
+      const response = await fetch(`/api/download/${linkId}?fileId=${file.id}`);
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
         throw new Error(payload?.error || "Failed to download file stream.");
@@ -115,7 +127,7 @@ export default function DownloadPage({ params }: { params: { id: string } }) {
   if (loading) return <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh" }}>Loading, please wait...</div>;
 
   if (requiresAuth && status !== "authenticated") {
-    const callbackUrl = `/login?callbackUrl=/${params.id}`;
+    const callbackUrl = `/login?callbackUrl=/${linkId}`;
     return (
       <main style={{ minHeight: "100vh", display: "flex", justifyContent: "center", alignItems: "center", padding: "2rem" }}>
         <div className="glass-panel" style={{ width: "100%", maxWidth: "520px", padding: "2rem", borderRadius: "var(--radius-lg)", textAlign: "center" }}>
@@ -147,7 +159,7 @@ export default function DownloadPage({ params }: { params: { id: string } }) {
       {!session && status !== "loading" && allowSave && (
         <div style={{ background: "rgba(59, 130, 246, 0.1)", border: "1px solid var(--accent-blue)", padding: "1rem", borderRadius: "var(--radius-sm)", marginBottom: "1.5rem", width: "100%", maxWidth: "500px", textAlign: "center" }}>
           <p style={{ margin: 0, fontSize: "0.95rem" }}>
-            Want to save this file to your dashboard? <Link href={`/login?callbackUrl=/${params.id}?save=true`} style={{ color: "var(--accent-blue)", fontWeight: "bold", textDecoration: "none" }}>Sign in now</Link>
+            Want to save this file to your dashboard? <Link href={`/login?callbackUrl=/${linkId}?save=true`} style={{ color: "var(--accent-blue)", fontWeight: "bold", textDecoration: "none" }}>Sign in now</Link>
           </p>
         </div>
       )}
@@ -187,7 +199,7 @@ export default function DownloadPage({ params }: { params: { id: string } }) {
                 fetch("/api/links/save", {
                   method: "POST",
                   headers: withCsrfHeaders({ "Content-Type": "application/json" }),
-                  body: JSON.stringify({ linkId: params.id })
+                  body: JSON.stringify({ linkId })
                 }).then(res => res.json()).then(data => {
                   if (data.success) {
                     setSaved(true);

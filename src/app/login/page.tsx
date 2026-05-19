@@ -21,6 +21,11 @@ export default function LoginPage() {
 
   useEffect(() => {
     const errorCode = searchParams.get("error");
+    const reason = searchParams.get("reason");
+    if (reason === "browser_closed") {
+      setError("For security, your session ended because the previous browser window was closed. Please log in again.");
+      return;
+    }
     if (errorCode === "database_unavailable") {
       setError("Authentication database is temporarily unavailable. Please verify DATABASE_URL and try again.");
       return;

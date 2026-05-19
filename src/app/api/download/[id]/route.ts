@@ -6,9 +6,12 @@ import { getClientIp, isValidLinkId, isValidUuid, noStoreJson } from '@/lib/secu
 import { databaseUnavailableMessage, isPrismaDatabaseConnectivityError } from '@/lib/prisma-errors';
 import { downloadSupabaseObject, isSupabaseStorageError } from '@/lib/supabase-storage';
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
   try {
-    const linkId = params.id;
+    const { id: linkId } = await context.params;
     if (!isValidLinkId(linkId)) {
       return noStoreJson({ error: 'Invalid link id' }, { status: 400 });
     }
