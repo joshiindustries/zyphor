@@ -1,11 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import type { File as DbFile } from '@prisma/client';
 import { getUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { getClientIp, isValidLinkId, isValidUuid, noStoreJson } from '@/lib/security';
 import { databaseUnavailableMessage, isPrismaDatabaseConnectivityError } from '@/lib/prisma-errors';
 import { downloadSupabaseObject, isSupabaseStorageError } from '@/lib/supabase-storage';
+
+type DownloadFileRow = {
+  id: string;
+  original_name: string;
+  size: number;
+  storage_path: string;
+  salt: string;
+  iv: string;
+};
 
 export async function GET(
   request: NextRequest,
@@ -46,7 +54,7 @@ export async function GET(
       return noStoreJson({ error: 'Download limit reached' }, { status: 410 });
     }
 
-    const files = link.files;
+    const files = link.files as DownloadFileRow[];
 
     if (files.length === 0) {
       return noStoreJson({ error: 'No files found' }, { status: 404 });
@@ -72,7 +80,7 @@ export async function GET(
       return noStoreJson({
         allowSave: link.allow_save,
         authRequired: requiresAuth,
-        files: files.map((f: DbFile) => ({
+        files: files.map((f: DownloadFileRow) => ({
           id: f.id,
           name: f.original_name,
           size: f.size,
@@ -82,7 +90,7 @@ export async function GET(
       });
     }
 
-    const file = files.find((f: DbFile) => f.id === downloadFileId);
+    const file = files.find((f: DownloadFileRow) => f.id === downloadFileId);
     if (!file) {
       return noStoreJson({ error: 'File not found in link' }, { status: 404 });
     }
