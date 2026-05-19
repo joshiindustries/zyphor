@@ -62,8 +62,32 @@ function getConnectionString(): string {
   return value;
 }
 
+function shouldDisableTlsVerification(connectionString: string): boolean {
+  const explicitSetting = process.env.DATABASE_SSL_NO_VERIFY?.trim().toLowerCase();
+  if (explicitSetting === "true") return true;
+  if (explicitSetting === "false") return false;
+
+  try {
+    const sslMode = new URL(connectionString).searchParams.get("sslmode")?.toLowerCase();
+    return sslMode === "no-verify";
+  } catch {
+    return false;
+  }
+}
+
 function createPrismaClient() {
-  const adapter = new PrismaPg({ connectionString: getConnectionString() });
+  const connectionString = getConnectionString();
+  const disableTlsVerification = shouldDisableTlsVerification(connectionString);
+
+  const adapter = new PrismaPg({
+    connectionString,
+    ...(disableTlsVerification ? { ssl: { rejectUnauthorized: false } } : {}),
+  });
+
+  if (disableTlsVerification) {
+    console.warn("[db] TLS certificate verification is disabled for Prisma (DATABASE_SSL_NO_VERIFY=true or sslmode=no-verify).");
+  }
+
   if (process.env.PRISMA_LOG_QUERIES === "true") {
     return new PrismaClient({ adapter, log: ["query", "error", "warn"] });
   }

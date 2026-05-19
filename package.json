@@ -3,7 +3,8 @@
   "version": "5.21.33",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --webpack",
+    "dev:turbo": "next dev",
     "prebuild": "prisma generate",
     "build": "next build",
     "postinstall": "prisma generate",
