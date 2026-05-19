@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import type { File as DbFile } from '@prisma/client';
 import { getUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { checkRateLimit } from '@/lib/rate-limit';
@@ -71,7 +72,7 @@ export async function GET(
       return noStoreJson({
         allowSave: link.allow_save,
         authRequired: requiresAuth,
-        files: files.map(f => ({
+        files: files.map((f: DbFile) => ({
           id: f.id,
           name: f.original_name,
           size: f.size,
@@ -81,7 +82,7 @@ export async function GET(
       });
     }
 
-    const file = files.find(f => f.id === downloadFileId);
+    const file = files.find((f: DbFile) => f.id === downloadFileId);
     if (!file) {
       return noStoreJson({ error: 'File not found in link' }, { status: 404 });
     }
