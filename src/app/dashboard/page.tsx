@@ -8,6 +8,36 @@ import LogoutButton from "@/components/LogoutButton";
 import UserAvatar from "@/components/UserAvatar";
 import SiteFooter from "@/components/SiteFooter";
 
+type DashboardLinkBase = {
+  id: string;
+  current_downloads: number;
+  max_downloads: number;
+  created_at: Date | string;
+  expires_at: Date | string;
+  allow_save: number;
+  auth_required: number;
+  [key: string]: unknown;
+};
+
+type DashboardLinkWithCount = DashboardLinkBase & {
+  _count: {
+    saved_by: number;
+  };
+};
+
+type DashboardLink = DashboardLinkBase & {
+  save_count: number;
+};
+
+type SavedLinkRow = {
+  link: DashboardLinkBase;
+  saved_at: Date | string;
+};
+
+type SavedDashboardLink = DashboardLinkBase & {
+  saved_at: Date | string;
+};
+
 export default async function DashboardPage() {
   const user = await getUser();
 
@@ -42,24 +72,27 @@ export default async function DashboardPage() {
         select: { saved_by: true }
       }
     }
-  });
+  }) as DashboardLinkWithCount[];
     
-  const links = linksRaw.map(link => ({
-    ...link,
-    save_count: link._count.saved_by
-  }));
+  const links: DashboardLink[] = linksRaw.map((link: DashboardLinkWithCount) => {
+    const { _count, ...rest } = link;
+    return {
+      ...rest,
+      save_count: _count.saved_by
+    };
+  });
 
   // Fetch saved links
   const savedLinksRaw = await prisma.savedLink.findMany({
     where: { user_id: user.id },
     orderBy: { saved_at: 'desc' },
     include: { link: true }
-  });
+  }) as SavedLinkRow[];
   
-  const savedLinks = savedLinksRaw.map(saved => ({
+  const savedLinks: SavedDashboardLink[] = savedLinksRaw.map((saved: SavedLinkRow) => ({
     ...saved.link,
     saved_at: saved.saved_at
-  })) as any[];
+  }));
 
   return (
     <main style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
