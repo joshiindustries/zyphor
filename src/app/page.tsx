@@ -436,7 +436,7 @@ export default function Home() {
 
   return (
     <main style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-      <header style={{ padding: "1.5rem 2rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <header className="main-header">
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
           <img src="/logo.png" alt="Zyphor Logo" style={{ height: "32px", width: "auto" }} />
           <h1 style={{ fontSize: "1.25rem", fontWeight: "700", letterSpacing: "-0.5px" }}>Zyphor</h1>
@@ -453,7 +453,7 @@ export default function Home() {
         </nav>
       </header>
 
-      <section style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", paddingTop: "6vh", paddingBottom: "4rem", paddingLeft: "2rem", paddingRight: "2rem", textAlign: "center", width: "100%" }}>
+      <section className="main-section">
         <h2 className="title-gradient" style={{ fontSize: "clamp(2.5rem, 5vw, 4rem)", fontWeight: "800", marginBottom: "1rem", lineHeight: "1.2", maxWidth: "800px" }}>
           Share securely with true End-to-End Encryption
         </h2>
@@ -461,7 +461,7 @@ export default function Home() {
           Military-grade AES-256 encryption within your browser. 
         </p>
 
-        <div className="glass-panel" style={{ width: "100%", maxWidth: "600px", padding: "2.5rem", borderRadius: "var(--radius-lg)" }}>
+        <div className="glass-panel" style={{ maxWidth: "600px" }}>
           
           {shareLink ? (
             <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", alignItems: "center" }}>

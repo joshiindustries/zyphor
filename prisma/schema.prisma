@@ -4,6 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -12,14 +13,37 @@ model User {
   password_hash  String?
   name           String?
   avatar         String?
-  dob            String?
-  created_at     DateTime    @default(now())
+  dob                 String?
+  username            String?     @unique
+  bio                 String?     @db.Text
+  theme_preference    String?     @default("system")
+  language_preference String?     @default("en")
+  profile_visibility  String?     @default("public")
+  online_status       String?     @default("online")
+  show_last_seen      Boolean     @default(true)
+  read_receipts       Boolean     @default(true)
+  created_at          DateTime    @default(now())
 
   links          Link[]
   accounts       Account[] // For social login
   saved_links    SavedLink[]
   sessions       Session[] // Custom session table
   download_logs  DownloadLog[]
+  keys           UserKey[]
+  sent_messages  Message[] @relation("SentMessages")
+  conversations_started Conversation[] @relation("ConversationsStarted")
+  conversations_joined  Conversation[] @relation("ConversationsJoined")
+  group_memberships     GroupMember[]
+  sent_group_messages   GroupMessage[] @relation("SentGroupMessages")
+  vault_folders         VaultFolder[]
+  vault_files           VaultFile[]
+  vault_tags            VaultTag[]
+  calls_initiated       Call[] @relation("Caller")
+  signals_sent          CallSignal[]
+  notes                 Note[]
+  note_shares           NoteShare[]
+  task_boards           TaskBoard[]
+  calendars             EventCalendar[]
 
   @@map("users")
 }
@@ -140,4 +164,276 @@ model RateLimit {
 
   @@index([identifier, action])
   @@map("rate_limits")
+}
+
+model UserKey {
+  id         String   @id @default(uuid())
+  user_id    String
+  public_key String   @db.Text
+  created_at DateTime @default(now())
+
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("user_keys")
+}
+
+model Conversation {
+  id         String   @id @default(uuid())
+  user1_id   String
+  user2_id   String
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  user1      User      @relation("ConversationsStarted", fields: [user1_id], references: [id], onDelete: Cascade)
+  user2      User      @relation("ConversationsJoined", fields: [user2_id], references: [id], onDelete: Cascade)
+  messages   Message[]
+  calls      Call[]
+
+  @@unique([user1_id, user2_id])
+  @@map("conversations")
+}
+
+model Message {
+  id                String   @id @default(uuid())
+  conversation_id   String
+  sender_id         String
+  encrypted_content String   @db.Text
+  created_at        DateTime @default(now())
+
+  conversation      Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+  sender            User         @relation("SentMessages", fields: [sender_id], references: [id], onDelete: Cascade)
+
+  @@index([conversation_id, created_at])
+  @@map("messages")
+}
+
+model Group {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  avatar      String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  members     GroupMember[]
+  messages    GroupMessage[]
+
+  @@map("groups")
+}
+
+model GroupMember {
+  id                  String   @id @default(uuid())
+  group_id            String
+  user_id             String
+  role                String   @default("MEMBER") // ADMIN or MEMBER
+  encrypted_group_key String   @db.Text
+  joined_at           DateTime @default(now())
+
+  group               Group    @relation(fields: [group_id], references: [id], onDelete: Cascade)
+  user                User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([group_id, user_id])
+  @@map("group_members")
+}
+
+model GroupMessage {
+  id                String   @id @default(uuid())
+  group_id          String
+  sender_id         String
+  encrypted_content String   @db.Text
+  created_at        DateTime @default(now())
+
+  group             Group    @relation(fields: [group_id], references: [id], onDelete: Cascade)
+  sender            User     @relation("SentGroupMessages", fields: [sender_id], references: [id], onDelete: Cascade)
+
+  @@index([group_id, created_at])
+  @@map("group_messages")
+}
+
+model VaultFolder {
+  id              String      @id @default(uuid())
+  user_id         String
+  parent_id       String?
+  encrypted_name  String      @db.Text
+  created_at      DateTime    @default(now())
+  updated_at      DateTime    @updatedAt
+
+  user            User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  parent          VaultFolder?  @relation("FolderHierarchy", fields: [parent_id], references: [id], onDelete: SetNull)
+  children        VaultFolder[] @relation("FolderHierarchy")
+  files           VaultFile[]
+
+  @@map("vault_folders")
+}
+
+model VaultFile {
+  id                 String       @id @default(uuid())
+  user_id            String
+  folder_id          String?
+  encrypted_metadata String       @db.Text
+  storage_path       String
+  is_trashed         Boolean      @default(false)
+  is_favorite        Boolean      @default(false)
+  created_at         DateTime     @default(now())
+  updated_at         DateTime     @updatedAt
+
+  user               User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  folder             VaultFolder? @relation(fields: [folder_id], references: [id], onDelete: SetNull)
+  versions           FileVersion[]
+
+  @@map("vault_files")
+}
+
+model FileVersion {
+  id                 String      @id @default(uuid())
+  file_id            String
+  storage_path       String
+  encrypted_metadata String      @db.Text
+  created_at         DateTime    @default(now())
+
+  file               VaultFile   @relation(fields: [file_id], references: [id], onDelete: Cascade)
+
+  @@map("file_versions")
+}
+
+model VaultTag {
+  id              String   @id @default(uuid())
+  user_id         String
+  encrypted_name  String   @db.Text
+  color           String?
+  created_at      DateTime @default(now())
+
+  user            User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("vault_tags")
+}
+
+model Call {
+  id              String      @id @default(uuid())
+  conversation_id String
+  caller_id       String
+  status          String      @default("RINGING") // RINGING, ONGOING, ENDED, MISSED
+  started_at      DateTime    @default(now())
+  ended_at        DateTime?
+
+  conversation    Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+  caller          User         @relation("Caller", fields: [caller_id], references: [id], onDelete: Cascade)
+  signals         CallSignal[]
+
+  @@map("calls")
+}
+
+model CallSignal {
+  id              String      @id @default(uuid())
+  call_id         String
+  sender_id       String
+  type            String      // OFFER, ANSWER, ICE_CANDIDATE
+  payload         String      @db.Text
+  created_at      DateTime    @default(now())
+
+  call            Call        @relation(fields: [call_id], references: [id], onDelete: Cascade)
+  sender          User        @relation(fields: [sender_id], references: [id], onDelete: Cascade)
+
+  @@index([call_id, created_at])
+  @@map("call_signals")
+}
+
+model Note {
+  id                String      @id @default(uuid())
+  user_id           String
+  encrypted_title   String      @db.Text
+  encrypted_content String      @db.Text
+  is_pinned         Boolean     @default(false)
+  created_at        DateTime    @default(now())
+  updated_at        DateTime    @updatedAt
+
+  user              User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  shares            NoteShare[]
+
+  @@map("notes")
+}
+
+model NoteShare {
+  id                  String   @id @default(uuid())
+  note_id             String
+  shared_with_user_id String
+  encrypted_note_key  String   @db.Text
+  access_level        String   @default("READ") // READ, WRITE
+  created_at          DateTime @default(now())
+
+  note                Note     @relation(fields: [note_id], references: [id], onDelete: Cascade)
+  shared_with         User     @relation(fields: [shared_with_user_id], references: [id], onDelete: Cascade)
+
+  @@unique([note_id, shared_with_user_id])
+  @@map("note_shares")
+}
+
+model TaskBoard {
+  id              String       @id @default(uuid())
+  user_id         String
+  encrypted_title String       @db.Text
+  created_at      DateTime     @default(now())
+
+  user            User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  columns         TaskColumn[]
+
+  @@map("task_boards")
+}
+
+model TaskColumn {
+  id              String       @id @default(uuid())
+  board_id        String
+  name            String
+  order           Int
+
+  board           TaskBoard    @relation(fields: [board_id], references: [id], onDelete: Cascade)
+  tasks           Task[]
+
+  @@map("task_columns")
+}
+
+model Task {
+  id                    String       @id @default(uuid())
+  column_id             String
+  encrypted_title       String       @db.Text
+  encrypted_description String?      @db.Text
+  order                 Int
+  due_date              DateTime?
+  created_at            DateTime     @default(now())
+  updated_at            DateTime     @updatedAt
+
+  column                TaskColumn   @relation(fields: [column_id], references: [id], onDelete: Cascade)
+
+  @@map("tasks")
+}
+
+model EventCalendar {
+  id              String   @id @default(uuid())
+  user_id         String
+  encrypted_name  String   @db.Text
+  color_hex       String   @default("#e74c3c")
+  created_at      DateTime @default(now())
+
+  user            User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  events          Event[]
+
+  @@map("event_calendars")
+}
+
+model Event {
+  id                    String        @id @default(uuid())
+  calendar_id           String
+  encrypted_title       String        @db.Text
+  encrypted_description String?       @db.Text
+  encrypted_location    String?       @db.Text
+  start_time            DateTime
+  end_time              DateTime
+  is_all_day            Boolean       @default(false)
+  created_at            DateTime      @default(now())
+  updated_at            DateTime      @updatedAt
+
+  calendar              EventCalendar @relation(fields: [calendar_id], references: [id], onDelete: Cascade)
+
+  @@map("events")
 }

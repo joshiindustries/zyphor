@@ -98,7 +98,7 @@ export default async function DashboardPage() {
 
   return (
     <main style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-      <header style={{ padding: "1.5rem 2rem", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--glass-border)", background: "var(--glass-bg)" }}>
+      <header className="main-header" style={{ borderBottom: "1px solid var(--glass-border)", background: "var(--glass-bg)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
           <img src="/logo.png" alt="Zyphor Logo" style={{ height: "32px", width: "auto" }} />
           <Link href="/" style={{ textDecoration: "none", color: "inherit" }}><h1 style={{ fontSize: "1.25rem", fontWeight: "700" }}>Zyphor</h1></Link>
@@ -112,8 +112,8 @@ export default async function DashboardPage() {
         </div>
       </header>
 
-      <div style={{ flex: 1, padding: "2rem", maxWidth: "1200px", margin: "0 auto", width: "100%" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
+      <div style={{ flex: 1, padding: "clamp(1rem, 4vw, 2rem)", maxWidth: "1200px", margin: "0 auto", width: "100%" }}>
+        <div className="dashboard-title-bar">
           <h2 style={{ fontSize: "2rem", fontWeight: "700" }}>Your Vault</h2>
           <Link href="/" className="btn btn-primary">+ New Transfer</Link>
         </div>

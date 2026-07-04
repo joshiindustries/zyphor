@@ -35,7 +35,23 @@ export default function PolicyPage() {
         </article>
 
         <article className="glass-panel" style={{ padding: "1rem", borderRadius: "var(--radius-md)" }}>
-          <h2 style={{ fontSize: "1.05rem", marginBottom: "0.4rem" }}>4. Contact</h2>
+          <h2 style={{ fontSize: "1.05rem", marginBottom: "0.4rem" }}>4. Data Security Disclaimer</h2>
+          <p style={{ color: "var(--text-secondary)", marginBottom: "0.75rem" }}>
+            While Zyphor is designed with end-to-end encryption and security best practices, no system can guarantee
+            absolute protection against all threats. J Industries and Zyphor are not responsible for any theft of
+            data, cyber attacks, unauthorized access, data loss, data corruption, or any other security incident,
+            whether caused by third parties, user error, system failure, network interruption, or any other
+            circumstance.
+          </p>
+          <p style={{ color: "var(--text-secondary)" }}>
+            You are solely responsible for maintaining the confidentiality of your encryption keys, passwords, and
+            account credentials. If you lose your encryption key or password, your encrypted data may be permanently
+            unrecoverable.
+          </p>
+        </article>
+
+        <article className="glass-panel" style={{ padding: "1rem", borderRadius: "var(--radius-md)" }}>
+          <h2 style={{ fontSize: "1.05rem", marginBottom: "0.4rem" }}>5. Contact</h2>
           <p style={{ color: "var(--text-secondary)" }}>
             For legal or policy requests, contact J Industries support through your official business channel.
           </p>

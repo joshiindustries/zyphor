@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  zyphor-db:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: zyphor_admin
+      POSTGRES_PASSWORD: supersecretpassword
+      POSTGRES_DB: zyphor_production
+    ports:
+      - "5432:5432"
+    volumes:
+      - zyphor_pgdata:/var/lib/postgresql/data
+
+  zyphor-web:
+    build: .
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      # Database connection URL for Prisma
+      - DATABASE_URL=postgresql://zyphor_admin:supersecretpassword@zyphor-db:5432/zyphor_production?schema=public
+      # NextAuth configuration
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=zyphor_super_secret_session_key_production
+      # Storage and other API keys (replace with real values in production)
+      - SUPABASE_URL=https://your-project.supabase.co
+      - SUPABASE_ANON_KEY=your-anon-key
+    depends_on:
+      - zyphor-db
+
+volumes:
+  zyphor_pgdata:

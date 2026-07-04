@@ -37,7 +37,11 @@ export async function POST(request: NextRequest) {
       return noStoreJson({ error: "Rate limit exceeded" }, { status: 429 });
     }
 
-    const { name, dob, image } = await request.json();
+    const { 
+      name, dob, image,
+      username, bio, theme_preference, language_preference,
+      profile_visibility, online_status, show_last_seen, read_receipts
+    } = await request.json();
     const userId = user.id;
 
     // Update user in DB
@@ -72,6 +76,59 @@ export async function POST(request: NextRequest) {
       updateData.avatar = safeImage || null;
     }
     
+    if (username !== undefined) {
+      if (typeof username !== "string") return noStoreJson({ error: "Invalid username format." }, { status: 400 });
+      const safeUsername = username.trim().toLowerCase();
+      if (safeUsername && !/^[a-z0-9_]{3,20}$/.test(safeUsername)) {
+        return noStoreJson({ error: "Username must be 3-20 characters, alphanumeric and underscores only." }, { status: 400 });
+      }
+      updateData.username = safeUsername || null;
+    }
+
+    if (bio !== undefined) {
+      if (typeof bio !== "string") return noStoreJson({ error: "Invalid bio format." }, { status: 400 });
+      const safeBio = bio.trim().slice(0, 500);
+      updateData.bio = safeBio || null;
+    }
+
+    if (theme_preference !== undefined) {
+      if (typeof theme_preference !== "string" || !["light", "dark", "system"].includes(theme_preference)) {
+        return noStoreJson({ error: "Invalid theme preference." }, { status: 400 });
+      }
+      updateData.theme_preference = theme_preference;
+    }
+
+    if (language_preference !== undefined) {
+      if (typeof language_preference !== "string" || language_preference.length > 10) {
+         return noStoreJson({ error: "Invalid language preference." }, { status: 400 });
+      }
+      updateData.language_preference = language_preference.trim();
+    }
+
+    if (profile_visibility !== undefined) {
+      if (typeof profile_visibility !== "string" || !["public", "contacts", "private"].includes(profile_visibility)) {
+         return noStoreJson({ error: "Invalid profile visibility." }, { status: 400 });
+      }
+      updateData.profile_visibility = profile_visibility;
+    }
+
+    if (online_status !== undefined) {
+      if (typeof online_status !== "string" || !["online", "away", "dnd", "offline"].includes(online_status)) {
+         return noStoreJson({ error: "Invalid online status." }, { status: 400 });
+      }
+      updateData.online_status = online_status;
+    }
+
+    if (show_last_seen !== undefined) {
+      if (typeof show_last_seen !== "boolean") return noStoreJson({ error: "Invalid last seen toggle." }, { status: 400 });
+      updateData.show_last_seen = show_last_seen;
+    }
+
+    if (read_receipts !== undefined) {
+      if (typeof read_receipts !== "boolean") return noStoreJson({ error: "Invalid read receipts toggle." }, { status: 400 });
+      updateData.read_receipts = read_receipts;
+    }
+    
     if (Object.keys(updateData).length > 0) {
       await prisma.user.update({
         where: { id: userId },
@@ -80,8 +137,11 @@ export async function POST(request: NextRequest) {
     }
 
     return noStoreJson({ success: true, message: "Profile updated" });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Profile update error:", error);
+    if (error?.code === "P2002" && error?.meta?.target?.includes("username")) {
+      return noStoreJson({ error: "Username is already taken." }, { status: 400 });
+    }
     if (isPrismaDatabaseConnectivityError(error)) {
       return noStoreJson({ error: databaseUnavailableMessage("Profile update") }, { status: 503 });
     }

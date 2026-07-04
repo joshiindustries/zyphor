@@ -34,6 +34,9 @@ export default function SiteFooter() {
           <Link href="/terms" style={{ color: "var(--accent-blue)", textDecoration: "none", fontSize: "0.85rem" }}>
             Terms
           </Link>
+          <Link href="/license" style={{ color: "var(--accent-blue)", textDecoration: "none", fontSize: "0.85rem" }}>
+            License
+          </Link>
           <Link href="/help/errors" style={{ color: "var(--accent-blue)", textDecoration: "none", fontSize: "0.85rem" }}>
             Error Center
           </Link>

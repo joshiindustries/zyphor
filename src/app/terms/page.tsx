@@ -34,8 +34,19 @@ export default function TermsPage() {
 
         <article className="glass-panel" style={{ padding: "1rem", borderRadius: "var(--radius-md)" }}>
           <h2 style={{ fontSize: "1.05rem", marginBottom: "0.4rem" }}>4. Warranty and Liability</h2>
+          <p style={{ color: "var(--text-secondary)", marginBottom: "0.75rem" }}>
+            Zyphor is provided &quot;as is&quot; and &quot;as available&quot; without warranties of any kind, whether
+            express or implied. J Industries does not guarantee uninterrupted, error-free, or fully secure operation
+            of the platform.
+          </p>
           <p style={{ color: "var(--text-secondary)" }}>
-            The service is provided as-is without guarantees. J Industries is not liable for indirect or consequential damages.
+            <strong>Limitation of Liability:</strong> J Industries and Zyphor are not responsible for any theft of
+            data, cyber attacks, unauthorized access, data loss, data corruption, or any other security incident,
+            whether caused by third parties, user error, system failure, network interruption, or any other
+            circumstance. To the fullest extent permitted by law, J Industries and Zyphor shall not be liable for
+            any direct, indirect, incidental, special, consequential, or punitive damages arising from your use of
+            the service. You use Zyphor at your own risk and are solely responsible for safeguarding your encryption
+            keys, passwords, accounts, and shared content.
           </p>
         </article>
       </section>

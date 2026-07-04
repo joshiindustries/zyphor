@@ -129,8 +129,8 @@ export default function DownloadPage() {
   if (requiresAuth && status !== "authenticated") {
     const callbackUrl = `/login?callbackUrl=/${linkId}`;
     return (
-      <main style={{ minHeight: "100vh", display: "flex", justifyContent: "center", alignItems: "center", padding: "2rem" }}>
-        <div className="glass-panel" style={{ width: "100%", maxWidth: "520px", padding: "2rem", borderRadius: "var(--radius-lg)", textAlign: "center" }}>
+      <main style={{ minHeight: "100vh", display: "flex", justifyContent: "center", alignItems: "center", padding: "clamp(1rem, 4vw, 2rem)" }}>
+        <div className="glass-panel" style={{ maxWidth: "520px", textAlign: "center" }}>
           <Lock color="var(--accent-blue)" size={40} style={{ margin: "0 auto 1rem auto" }} />
           <h2 style={{ fontSize: "1.4rem", marginBottom: "0.5rem" }}>Sign-In Required</h2>
           <p style={{ color: "var(--text-secondary)", marginBottom: "1.25rem" }}>
@@ -152,7 +152,7 @@ export default function DownloadPage() {
   );
 
   return (
-    <main style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "2rem" }}>
+    <main style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "clamp(1rem, 4vw, 2rem)" }}>
       
 
 
@@ -170,7 +170,7 @@ export default function DownloadPage() {
         </div>
       )}
 
-      <div className="glass-panel" style={{ width: "100%", maxWidth: "500px", padding: "2.5rem", borderRadius: "var(--radius-lg)", textAlign: "center" }}>
+      <div className="glass-panel" style={{ maxWidth: "500px", textAlign: "center" }}>
         <ShieldCheck color="var(--accent-blue)" size={48} style={{ margin: "0 auto 1.5rem auto" }} />
         <h2 className="title-gradient" style={{ fontSize: "2rem", fontWeight: "700", marginBottom: "0.5rem" }}>Secure Download</h2>
         <p style={{ color: "var(--text-secondary)", marginBottom: "2rem" }}>{files.length} file(s) shared with you. Enter the password to decrypt.</p>

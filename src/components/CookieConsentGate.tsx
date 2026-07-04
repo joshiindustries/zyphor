@@ -79,12 +79,16 @@ export default function CookieConsentGate() {
           By continuing, you agree to our{" "}
           <Link href="/policy" style={{ color: "var(--accent-blue)", textDecoration: "none" }}>
             Policy
-          </Link>{" "}
-          and{" "}
+          </Link>
+          ,{" "}
           <Link href="/terms" style={{ color: "var(--accent-blue)", textDecoration: "none" }}>
             Terms
           </Link>
-          .
+          , and{" "}
+          <Link href="/license" style={{ color: "var(--accent-blue)", textDecoration: "none" }}>
+            License
+          </Link>
+          . J Industries and Zyphor are not responsible for data theft, cyber attacks, or data loss.
         </p>
         <div style={{ marginTop: "1rem", display: "flex", justifyContent: "flex-end" }}>
           <button
