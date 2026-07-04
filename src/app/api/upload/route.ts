@@ -1,6 +1,5 @@
 import { NextRequest } from 'next/server';
 import crypto from 'crypto';
-import { v4 as uuidv4 } from 'uuid';
 import { getUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { checkRateLimit } from '@/lib/rate-limit';
@@ -150,7 +149,7 @@ export async function POST(request: NextRequest) {
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const fileId = uuidv4();
+        const fileId = crypto.randomUUID();
         const salt = salts[i];
         const iv = ivs[i];
         const originalName = (originalNames[i] || file.name || 'encrypted-file').slice(0, 255);
