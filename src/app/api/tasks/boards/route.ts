@@ -12,7 +12,12 @@ export async function GET(request: NextRequest) {
 
     const boards = await prisma.taskBoard.findMany({
       where: { user_id: user.id },
-      orderBy: { created_at: "desc" }
+      orderBy: { created_at: 'desc' },
+      include: {
+        _count: {
+          select: { columns: true }
+        }
+      }
     });
 
     return noStoreJson({ success: true, boards });
@@ -30,12 +35,10 @@ export async function POST(request: NextRequest) {
     }
 
     const { encrypted_title } = await request.json();
-
-    if (!encrypted_title) {
-      return noStoreJson({ error: "encrypted_title is required" }, { status: 400 });
+    if (!encrypted_title || typeof encrypted_title !== "string") {
+      return noStoreJson({ error: "Invalid encrypted_title" }, { status: 400 });
     }
 
-    // Create the board and default columns
     const board = await prisma.taskBoard.create({
       data: {
         user_id: user.id,
@@ -47,9 +50,6 @@ export async function POST(request: NextRequest) {
             { name: "Done", order: 2 }
           ]
         }
-      },
-      include: {
-        columns: true
       }
     });
 

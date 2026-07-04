@@ -1,71 +1,189 @@
-import { getUser } from "@/lib/auth";
-import { redirect } from "next/navigation";
+"use client";
+
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Kanban, Plus, Search, CalendarDays, ArrowLeft, Layout } from "lucide-react";
+import { KanbanSquare, Plus, Lock, ArrowRight, CheckCircle } from "lucide-react";
+import { deriveKeyFromPassword, encryptData, decryptData } from "@/lib/crypto";
+import { useRouter } from "next/navigation";
 
-export const dynamic = "force-dynamic";
+export default function BoardsList() {
+  const router = useRouter();
+  const [masterPassword, setMasterPassword] = useState("");
+  const [masterKey, setMasterKey] = useState<CryptoKey | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  
+  const [boards, setBoards] = useState<any[]>([]);
+  const [isAdding, setIsAdding] = useState(false);
+  const [newBoardName, setNewBoardName] = useState("");
 
-export default async function TasksPage() {
-  const sessionUser = await getUser();
+  useEffect(() => {
+    const pwd = sessionStorage.getItem("zyphor_vault_pwd");
+    if (pwd) {
+      // Auto-unlock if we already have the password in session
+      setMasterPassword(pwd);
+      // Let user click unlock or auto-unlock? Let's make them click unlock for security feel, or auto if we refactor.
+    }
+  }, []);
 
-  if (!sessionUser) {
-    redirect("/login");
+  const handleUnlock = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+
+    try {
+      const saltRes = await fetch("/api/vault/salt");
+      const saltData = await saltRes.json();
+      if (!saltData.success) throw new Error("Vault not initialized.");
+
+      const key = await deriveKeyFromPassword(masterPassword, saltData.salt);
+      
+      const validationRes = await fetch("/api/vault/verify");
+      const validationData = await validationRes.json();
+      
+      try {
+        await decryptData(validationData.encrypted_validation, key);
+      } catch (err) {
+        throw new Error("Incorrect master password.");
+      }
+
+      setMasterKey(key);
+      sessionStorage.setItem("zyphor_vault_pwd", masterPassword);
+      await loadBoards(key);
+
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadBoards = async (key: CryptoKey) => {
+    const res = await fetch("/api/tasks/boards");
+    const data = await res.json();
+    if (data.success) {
+      const decrypted = [];
+      for (const b of data.boards) {
+        try {
+          const title = await decryptData(b.encrypted_title, key);
+          decrypted.push({ ...b, title });
+        } catch (err) {
+          decrypted.push({ ...b, title: "Failed to decrypt" });
+        }
+      }
+      setBoards(decrypted);
+    }
+  };
+
+  const handleCreateBoard = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!masterKey || !newBoardName.trim()) return;
+    setLoading(true);
+    try {
+      const encryptedTitle = await encryptData(newBoardName, masterKey);
+      const res = await fetch("/api/tasks/boards", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ encrypted_title: encryptedTitle })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIsAdding(false);
+        setNewBoardName("");
+        await loadBoards(masterKey);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!masterKey) {
+    return (
+      <div style={{ padding: "4rem 2rem", maxWidth: "500px", margin: "0 auto", textAlign: "center" }}>
+        <div style={{ background: "rgba(255,255,255,0.03)", padding: "2rem", borderRadius: "var(--radius-lg)", border: "1px solid var(--glass-border)" }}>
+          <Lock size={48} color="var(--accent-blue)" style={{ margin: "0 auto 1.5rem" }} />
+          <h1 style={{ fontSize: "1.5rem", fontWeight: "600", marginBottom: "0.5rem" }}>Unlock Tasks</h1>
+          <p style={{ color: "var(--text-secondary)", marginBottom: "2rem", fontSize: "0.95rem" }}>
+            Your Kanban boards are End-to-End Encrypted. Enter your Master Vault Password to unlock them.
+          </p>
+
+          <form onSubmit={handleUnlock} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <input 
+              type="password" 
+              placeholder="Master Password" 
+              value={masterPassword} 
+              onChange={e => setMasterPassword(e.target.value)}
+              className="input-field" 
+              required
+            />
+            {error && <div style={{ color: "var(--accent-red)", fontSize: "0.9rem" }}>{error}</div>}
+            <button type="submit" className="btn btn-primary" disabled={loading} style={{ padding: "0.75rem" }}>
+              {loading ? "Decrypting..." : "Unlock Boards"}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <main style={{ height: "100vh", display: "flex", flexDirection: "column", overflow: "hidden", background: "var(--bg-main)" }}>
-      <header style={{ padding: "1rem 2rem", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--glass-border)", background: "var(--glass-bg)", flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <Link href="/dashboard" style={{ textDecoration: "none", color: "inherit" }}><h1 style={{ fontSize: "1.25rem", fontWeight: "700" }}>Zyphor Tasks</h1></Link>
-          <span style={{ fontSize: "0.75rem", background: "#e74c3c", padding: "0.1rem 0.5rem", borderRadius: "10px", fontWeight: "600", color: "#fff" }}>E2E Encrypted</span>
+    <div style={{ padding: "2rem", maxWidth: "1200px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "2rem" }}>
+      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+        <div>
+          <h1 style={{ fontSize: "2rem", fontWeight: "700", marginBottom: "0.5rem", display: "flex", alignItems: "center", gap: "0.75rem" }}>
+            <KanbanSquare size={32} color="var(--accent-blue)" />
+            Task Boards
+          </h1>
+          <p style={{ color: "var(--text-secondary)", fontSize: "1rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <Lock size={14} /> End-to-End Encrypted Workspace
+          </p>
         </div>
-        <Link href="/dashboard" className="btn btn-secondary" style={{ padding: "0.5rem 1rem", border: "none", background: "transparent" }}>
-          <ArrowLeft size={16} /> Dashboard
-        </Link>
+        <button className="btn btn-primary" onClick={() => setIsAdding(true)} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <Plus size={18} /> New Board
+        </button>
       </header>
 
-      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
-        {/* Sidebar */}
-        <div style={{ width: "260px", borderRight: "1px solid var(--glass-border)", background: "rgba(0,0,0,0.2)", display: "flex", flexDirection: "column" }}>
-          <div style={{ padding: "2rem 1rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            <button className="btn btn-primary" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", marginBottom: "1rem", background: "#e74c3c" }}>
-              <Plus size={16} /> New Board
-            </button>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.75rem", background: "rgba(255,255,255,0.1)", borderRadius: "var(--radius-sm)", cursor: "pointer", fontWeight: "600" }}>
-              <Layout size={18} color="#e74c3c" /> All Boards
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.75rem", borderRadius: "var(--radius-sm)", cursor: "pointer", color: "var(--text-secondary)" }}>
-              <CalendarDays size={18} color="var(--accent-purple)" /> Upcoming
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.75rem", borderRadius: "var(--radius-sm)", cursor: "pointer", color: "var(--text-secondary)" }}>
-              <Search size={18} color="var(--accent-blue)" /> Search Tasks
-            </div>
-          </div>
+      {isAdding && (
+        <div style={{ background: "rgba(255,255,255,0.03)", padding: "1.5rem", borderRadius: "var(--radius-md)", border: "1px solid var(--glass-border)", marginBottom: "1rem" }}>
+          <form onSubmit={handleCreateBoard} style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
+            <input 
+              type="text" 
+              placeholder="Board Name (e.g. Zyphor Roadmap)" 
+              className="input-field"
+              style={{ flex: 1 }}
+              value={newBoardName}
+              onChange={e => setNewBoardName(e.target.value)}
+              required
+            />
+            <button type="button" className="btn btn-secondary" onClick={() => setIsAdding(false)}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={loading}>{loading ? "Encrypting..." : "Create Board"}</button>
+          </form>
         </div>
+      )}
 
-        {/* Main Content Area */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "2rem", overflowY: "auto" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
-            <h2 style={{ fontSize: "1.5rem", fontWeight: "600" }}>All Boards</h2>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "1.5rem" }}>
+        {boards.length === 0 && !isAdding && (
+          <div style={{ gridColumn: "1 / -1", padding: "4rem", textAlign: "center", background: "rgba(255,255,255,0.02)", borderRadius: "var(--radius-md)", border: "1px dashed var(--glass-border)" }}>
+            <KanbanSquare size={48} color="var(--text-secondary)" style={{ margin: "0 auto 1rem", opacity: 0.5 }} />
+            <p style={{ color: "var(--text-secondary)", marginBottom: "1rem" }}>You don't have any boards yet.</p>
+            <button className="btn btn-secondary" onClick={() => setIsAdding(true)}>Create Your First Board</button>
           </div>
+        )}
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "1.5rem" }}>
-            {/* Placeholder Board Card */}
-            <div style={{ background: "var(--glass-bg)", border: "1px solid var(--glass-border)", borderRadius: "var(--radius-md)", padding: "1.5rem", display: "flex", flexDirection: "column", cursor: "pointer", transition: "transform 0.2s", height: "180px" }} className="hover:scale-105">
-              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1rem" }}>
-                <div style={{ background: "rgba(231,76,60,0.2)", padding: "0.5rem", borderRadius: "8px" }}>
-                  <Kanban size={24} color="#e74c3c" />
-                </div>
-                <h3 style={{ fontWeight: "600", fontSize: "1.1rem", margin: 0, wordBreak: "break-all" }}>Encrypted Project...</h3>
+        {boards.map(b => (
+          <Link key={b.id} href={`/dashboard/tasks/${b.id}`} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+            <div style={{ background: "var(--glass-bg)", border: "1px solid var(--glass-border)", borderRadius: "var(--radius-md)", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem", height: "100%", transition: "transform 0.2s, border-color 0.2s" }} className="hover:border-blue-500 hover:scale-[1.02]">
+              <h3 style={{ fontSize: "1.2rem", fontWeight: "600", color: "var(--accent-blue)" }}>{b.title}</h3>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "auto", color: "var(--text-secondary)", fontSize: "0.85rem" }}>
+                <span>{b._count.columns} Columns</span>
+                <span style={{ display: "flex", alignItems: "center", gap: "0.25rem", color: "var(--accent-green)" }}><CheckCircle size={14} /> E2EE Active</span>
               </div>
-              <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem", flex: 1 }}>
-                3 Columns • 12 Tasks
-              </p>
-              <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "auto" }}>Updated Today</span>
             </div>
-          </div>
-        </div>
+          </Link>
+        ))}
       </div>
-    </main>
+    </div>
   );
 }

@@ -146,7 +146,7 @@ export async function generateAESKey(): Promise<CryptoKey> {
   );
 }
 
-export async function encryptTextWithAES(aesKey: CryptoKey, plaintext: string): Promise<{ iv: string, ciphertext: string }> {
+export async function encryptTextWithAES(aesKey: CryptoKey, plaintext: string): Promise<string> {
   const encoder = new TextEncoder();
   const iv = window.crypto.getRandomValues(new Uint8Array(12));
   const encryptedBuffer = await window.crypto.subtle.encrypt(
@@ -155,13 +155,14 @@ export async function encryptTextWithAES(aesKey: CryptoKey, plaintext: string): 
     encoder.encode(plaintext)
   );
 
-  return {
-    iv: arrayBufferToBase64(iv.buffer),
-    ciphertext: arrayBufferToBase64(encryptedBuffer)
-  };
+  const ivBase64 = arrayBufferToBase64(iv.buffer);
+  const ciphertextBase64 = arrayBufferToBase64(encryptedBuffer);
+  return `${ivBase64}:${ciphertextBase64}`;
 }
 
-export async function decryptTextWithAES(aesKey: CryptoKey, ivBase64: string, ciphertextBase64: string): Promise<string> {
+export async function decryptTextWithAES(aesKey: CryptoKey, payload: string): Promise<string> {
+  const [ivBase64, ciphertextBase64] = payload.split(':');
+  if (!ivBase64 || !ciphertextBase64) return "";
   const ivBuffer = base64ToArrayBuffer(ivBase64);
   const ciphertextBuffer = base64ToArrayBuffer(ciphertextBase64);
   const decryptedBuffer = await window.crypto.subtle.decrypt(
@@ -169,7 +170,6 @@ export async function decryptTextWithAES(aesKey: CryptoKey, ivBase64: string, ci
     aesKey,
     ciphertextBuffer
   );
-
   return new TextDecoder().decode(decryptedBuffer);
 }
 

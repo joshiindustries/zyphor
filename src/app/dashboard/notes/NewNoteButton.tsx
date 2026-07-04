@@ -16,15 +16,15 @@ export function NewNoteButton() {
       const aesKey = await generateAESKey();
       
       // 2. Encrypt default title
-      const { iv, ciphertext } = await encryptTextWithAES(aesKey, "Untitled Note");
+      const encryptedPayload = await encryptTextWithAES(aesKey, "Untitled Note");
 
       // 3. POST to /api/notes
       const res = await fetch("/api/notes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          encrypted_title: ciphertext,
-          iv: iv
+          encrypted_title: encryptedPayload,
+          encrypted_content: "", // Empty initial content
         })
       });
 

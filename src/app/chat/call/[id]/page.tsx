@@ -1,130 +1,45 @@
-"use client";
+import { getUser } from "@/lib/auth";
+import { prisma } from "@/lib/db";
+import { redirect } from "next/navigation";
+import CallClient from "./CallClient";
 
-import { useEffect, useRef, useState , use } from "react";
-import { Mic, MicOff, Video, VideoOff, PhoneOff } from "lucide-react";
-import { ZyphorWebRTC } from "@/lib/webrtc";
+export const dynamic = "force-dynamic";
 
-export default function CallPage(props: { params: Promise<{ id: string }> }) {
-  const params = use(props.params);
-  const localVideoRef = useRef<HTMLVideoElement>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement>(null);
-  
-  const [webrtc, setWebrtc] = useState<ZyphorWebRTC | null>(null);
-  const [micOn, setMicOn] = useState(true);
-  const [camOn, setCamOn] = useState(true);
-  const [status, setStatus] = useState("Connecting...");
+export default async function CallPage(props: { params: Promise<{ id: string }> }) {
+  const sessionUser = await getUser();
+  if (!sessionUser) redirect("/login");
 
-  useEffect(() => {
-    // 1. Initialize WebRTC
-    const rtc = new ZyphorWebRTC(async (type, payload) => {
-      // Send signal to API
-      await fetch("/api/calls/signal", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          call_id: params.id,
-          type,
-          payload
-        })
-      });
-    });
+  const { id } = await props.params;
 
-    setWebrtc(rtc);
-
-    // 2. Start local stream
-    rtc.startLocalStream(true, true).then((stream) => {
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
-      }
-      setStatus("Waiting for peer...");
-      
-      // In a real implementation, we would poll or use WebSockets here 
-      // to check for incoming signals and call rtc.handleOffer, rtc.handleAnswer, etc.
-    }).catch(err => {
-      console.error("Failed to start local stream", err);
-      setStatus("Camera/Mic access denied");
-    });
-
-    // 3. Attach remote stream
-    const remoteStream = rtc.getRemoteStream();
-    if (remoteVideoRef.current) {
-      remoteVideoRef.current.srcObject = remoteStream;
-    }
-
-    return () => {
-      rtc.endCall();
-    };
-  }, [params.id]);
-
-  const toggleMic = () => {
-    if (!webrtc) return;
-    const stream = localVideoRef.current?.srcObject as MediaStream;
-    if (stream) {
-      const audioTrack = stream.getAudioTracks()[0];
-      if (audioTrack) {
-        audioTrack.enabled = !audioTrack.enabled;
-        setMicOn(audioTrack.enabled);
+  const call = await prisma.call.findUnique({
+    where: { id },
+    include: {
+      caller: { select: { id: true, name: true, avatar: true } },
+      conversation: {
+        include: {
+          user1: { select: { id: true, name: true, avatar: true } },
+          user2: { select: { id: true, name: true, avatar: true } }
+        }
       }
     }
-  };
+  });
 
-  const toggleCam = () => {
-    if (!webrtc) return;
-    const stream = localVideoRef.current?.srcObject as MediaStream;
-    if (stream) {
-      const videoTrack = stream.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack.enabled = !videoTrack.enabled;
-        setCamOn(videoTrack.enabled);
-      }
-    }
-  };
+  if (!call) redirect("/chat");
 
-  const endCall = () => {
-    if (webrtc) webrtc.endCall();
-    window.location.href = "/chat";
-  };
+  // Ensure user is part of the conversation
+  if (call.conversation.user1_id !== sessionUser.id && call.conversation.user2_id !== sessionUser.id) {
+    redirect("/chat");
+  }
+
+  const isCaller = call.caller_id === sessionUser.id;
+  const otherUser = call.conversation.user1_id === sessionUser.id ? call.conversation.user2 : call.conversation.user1;
 
   return (
-    <main style={{ height: "100vh", background: "#000", position: "relative", display: "flex", flexDirection: "column" }}>
-      {/* Remote Video (Full Screen) */}
-      <div style={{ flex: 1, position: "relative" }}>
-        <video 
-          ref={remoteVideoRef} 
-          autoPlay 
-          playsInline 
-          style={{ width: "100%", height: "100%", objectFit: "cover" }} 
-        />
-        
-        {/* Status Overlay */}
-        <div style={{ position: "absolute", top: "2rem", left: "50%", transform: "translateX(-50%)", background: "rgba(0,0,0,0.5)", padding: "0.5rem 1.5rem", borderRadius: "2rem", color: "#fff", fontWeight: "600", zIndex: 10, backdropFilter: "blur(10px)" }}>
-          {status}
-        </div>
-      </div>
-
-      {/* Local Video (PiP) */}
-      <div style={{ position: "absolute", bottom: "100px", right: "2rem", width: "200px", height: "300px", borderRadius: "var(--radius-md)", overflow: "hidden", border: "2px solid rgba(255,255,255,0.2)", background: "#111", zIndex: 20, boxShadow: "0 10px 30px rgba(0,0,0,0.5)" }}>
-        <video 
-          ref={localVideoRef} 
-          autoPlay 
-          playsInline 
-          muted 
-          style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)" }} 
-        />
-      </div>
-
-      {/* Controls */}
-      <div style={{ position: "absolute", bottom: "2rem", left: "50%", transform: "translateX(-50%)", display: "flex", gap: "1rem", background: "rgba(0,0,0,0.5)", padding: "1rem 2rem", borderRadius: "3rem", backdropFilter: "blur(10px)", border: "1px solid rgba(255,255,255,0.1)", zIndex: 20 }}>
-        <button onClick={toggleMic} style={{ width: "50px", height: "50px", borderRadius: "50%", border: "none", background: micOn ? "rgba(255,255,255,0.1)" : "#e74c3c", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "0.2s" }} className="hover:scale-105">
-          {micOn ? <Mic size={24} /> : <MicOff size={24} />}
-        </button>
-        <button onClick={toggleCam} style={{ width: "50px", height: "50px", borderRadius: "50%", border: "none", background: camOn ? "rgba(255,255,255,0.1)" : "#e74c3c", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "0.2s" }} className="hover:scale-105">
-          {camOn ? <Video size={24} /> : <VideoOff size={24} />}
-        </button>
-        <button onClick={endCall} style={{ width: "50px", height: "50px", borderRadius: "50%", border: "none", background: "#e74c3c", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "0.2s" }} className="hover:scale-105">
-          <PhoneOff size={24} />
-        </button>
-      </div>
-    </main>
+    <CallClient 
+      callId={call.id} 
+      sessionUserId={sessionUser.id} 
+      isCaller={isCaller} 
+      otherUser={otherUser} 
+    />
   );
 }

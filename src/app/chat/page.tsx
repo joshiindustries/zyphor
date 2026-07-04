@@ -12,7 +12,7 @@ export default async function ChatPage() {
     redirect("/login");
   }
 
-  // Fetch conversations
+  // Fetch direct conversations
   const conversations = await prisma.conversation.findMany({
     where: {
       OR: [
@@ -27,7 +27,6 @@ export default async function ChatPage() {
     orderBy: { updated_at: 'desc' }
   });
 
-  // Ensure plain objects for passing to Client Component
   const initialConversations = conversations.map(conv => ({
     id: conv.id,
     user1_id: conv.user1_id,
@@ -38,5 +37,37 @@ export default async function ChatPage() {
     updated_at: conv.updated_at.toISOString()
   }));
 
-  return <ChatClient sessionUser={{ id: sessionUser.id }} initialConversations={initialConversations} />;
+  // Fetch groups
+  const groupMemberships = await prisma.groupMember.findMany({
+    where: { user_id: sessionUser.id },
+    include: {
+      group: {
+        include: {
+          members: {
+            include: {
+              user: { select: { id: true, name: true, username: true, avatar: true } }
+            }
+          }
+        }
+      }
+    },
+    orderBy: { group: { updated_at: 'desc' } }
+  });
+
+  const initialGroups = groupMemberships.map(gm => ({
+    id: gm.group.id,
+    name: gm.group.name,
+    description: gm.group.description,
+    encrypted_group_key: gm.encrypted_group_key,
+    my_role: gm.role,
+    members: gm.group.members.map(m => ({
+      id: m.user.id,
+      name: m.user.name,
+      username: m.user.username,
+      avatar: m.user.avatar,
+      role: m.role
+    }))
+  }));
+
+  return <ChatClient sessionUser={{ id: sessionUser.id }} initialConversations={initialConversations} initialGroups={initialGroups} />;
 }

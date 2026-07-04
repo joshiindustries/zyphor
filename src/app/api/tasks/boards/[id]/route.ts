@@ -4,29 +4,30 @@ import { prisma } from "@/lib/db";
 import { noStoreJson } from "@/lib/security";
 
 export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
-  const params = await props.params;
   try {
     const user = await getUser();
     if (!user) {
       return noStoreJson({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { id } = await props.params;
+
     const board = await prisma.taskBoard.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         columns: {
+          orderBy: { order: 'asc' },
           include: {
             tasks: {
-              orderBy: { order: "asc" }
+              orderBy: { order: 'asc' }
             }
-          },
-          orderBy: { order: "asc" }
+          }
         }
       }
     });
 
     if (!board || board.user_id !== user.id) {
-      return noStoreJson({ error: "Board not found" }, { status: 404 });
+      return noStoreJson({ error: "Not found" }, { status: 404 });
     }
 
     return noStoreJson({ success: true, board });

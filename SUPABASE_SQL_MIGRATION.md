@@ -226,3 +226,45 @@ Checklist:
 
 ### Google/GitHub password expectations
 You can sync user profile fields (name, email, avatar), but **you cannot fetch user passwords** from Google or GitHub OAuth providers. Use Supabase password auth for email/password accounts.
+
+-- Phase 9: Security Dashboard Models
+CREATE TABLE login_history (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  ip_address TEXT,
+  location TEXT,
+  os TEXT,
+  browser TEXT,
+  status TEXT NOT NULL DEFAULT 'SUCCESS',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE TABLE trusted_devices (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  device_id TEXT NOT NULL UNIQUE,
+  name TEXT,
+  os TEXT,
+  browser TEXT,
+  last_active TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE TABLE security_alerts (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  type TEXT NOT NULL,
+  message TEXT NOT NULL,
+  severity TEXT NOT NULL DEFAULT 'INFO',
+  read BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Phase 10: Password Manager
+CREATE TABLE password_entries (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  encrypted_data TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
