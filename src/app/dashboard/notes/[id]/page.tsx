@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState , use } from "react";
 import Link from "next/link";
 import { ArrowLeft, Save, Share2, Shield, Lock, Unlock, Database } from "lucide-react";
 import { importAESKeyFromRaw, base64ToArrayBuffer, generateAESKey, encryptTextWithAES, decryptTextWithAES } from "@/lib/crypto";
 import { motion, AnimatePresence } from "framer-motion";
 
-export default function NoteEditorPage({ params }: { params: { id: string } }) {
+export default function NoteEditorPage(props: { params: Promise<{ id: string }> }) {
+  const params = use(props.params);
   const [title, setTitle] = useState("Loading...");
   const [content, setContent] = useState("");
   const [isSaving, setIsSaving] = useState(false);

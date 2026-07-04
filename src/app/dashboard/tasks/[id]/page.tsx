@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState , use } from "react";
 import Link from "next/link";
 import { ArrowLeft, Plus, MoreHorizontal, Shield } from "lucide-react";
 
-export default function KanbanBoardPage({ params }: { params: { id: string } }) {
+export default function KanbanBoardPage(props: { params: Promise<{ id: string }> }) {
+  const params = use(props.params);
   const [boardTitle, setBoardTitle] = useState("Loading Board...");
   const [columns, setColumns] = useState<any[]>([]);
 

@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState , use } from "react";
 import { Mic, MicOff, Video, VideoOff, PhoneOff } from "lucide-react";
 import { ZyphorWebRTC } from "@/lib/webrtc";
 
-export default function CallPage({ params }: { params: { id: string } }) {
+export default function CallPage(props: { params: Promise<{ id: string }> }) {
+  const params = use(props.params);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   
