@@ -2,7 +2,7 @@ import { getUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Globe } from "lucide-react";
+import { Globe, FileText, CheckSquare, Calendar, Video, Key } from "lucide-react";
 import LinkCard from "./LinkCard";
 import LogoutButton from "@/components/LogoutButton";
 import UserAvatar from "@/components/UserAvatar";
@@ -113,8 +113,45 @@ export default async function DashboardPage() {
       </header>
 
       <div style={{ flex: 1, padding: "clamp(1rem, 4vw, 2rem)", maxWidth: "1200px", margin: "0 auto", width: "100%" }}>
+        
+        <section style={{ marginBottom: "4rem" }}>
+          <h2 style={{ fontSize: "1.5rem", fontWeight: "700", marginBottom: "1.5rem" }}>Zyphor Suite</h2>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "1rem" }}>
+            <Link href="/dashboard/notes" className="glass-panel" style={{ textDecoration: "none", color: "inherit", padding: "1.5rem", borderRadius: "var(--radius-lg)", display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem", transition: "all 0.2s" }}>
+              <div style={{ background: "rgba(230, 126, 34, 0.1)", padding: "1rem", borderRadius: "50%" }}>
+                <FileText size={32} color="#e67e22" />
+              </div>
+              <span style={{ fontWeight: "600" }}>Notes</span>
+            </Link>
+            <Link href="/dashboard/tasks" className="glass-panel" style={{ textDecoration: "none", color: "inherit", padding: "1.5rem", borderRadius: "var(--radius-lg)", display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem", transition: "all 0.2s" }}>
+              <div style={{ background: "rgba(52, 152, 219, 0.1)", padding: "1rem", borderRadius: "50%" }}>
+                <CheckSquare size={32} color="#3498db" />
+              </div>
+              <span style={{ fontWeight: "600" }}>Tasks</span>
+            </Link>
+            <Link href="/dashboard/calendar" className="glass-panel" style={{ textDecoration: "none", color: "inherit", padding: "1.5rem", borderRadius: "var(--radius-lg)", display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem", transition: "all 0.2s" }}>
+              <div style={{ background: "rgba(155, 89, 182, 0.1)", padding: "1rem", borderRadius: "50%" }}>
+                <Calendar size={32} color="#9b59b6" />
+              </div>
+              <span style={{ fontWeight: "600" }}>Calendar</span>
+            </Link>
+            <Link href="/chat" className="glass-panel" style={{ textDecoration: "none", color: "inherit", padding: "1.5rem", borderRadius: "var(--radius-lg)", display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem", transition: "all 0.2s" }}>
+              <div style={{ background: "rgba(46, 204, 113, 0.1)", padding: "1rem", borderRadius: "50%" }}>
+                <Video size={32} color="#2ecc71" />
+              </div>
+              <span style={{ fontWeight: "600" }}>Meet & Chat</span>
+            </Link>
+            <Link href="/dashboard/setup-keys" className="glass-panel" style={{ textDecoration: "none", color: "inherit", padding: "1.5rem", borderRadius: "var(--radius-lg)", display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem", transition: "all 0.2s" }}>
+              <div style={{ background: "rgba(241, 196, 15, 0.1)", padding: "1rem", borderRadius: "50%" }}>
+                <Key size={32} color="#f1c40f" />
+              </div>
+              <span style={{ fontWeight: "600" }}>Device Keys</span>
+            </Link>
+          </div>
+        </section>
+
         <div className="dashboard-title-bar">
-          <h2 style={{ fontSize: "2rem", fontWeight: "700" }}>Your Vault</h2>
+          <h2 style={{ fontSize: "1.5rem", fontWeight: "700" }}>Your Vault</h2>
           <Link href="/" className="btn btn-primary">+ New Transfer</Link>
         </div>
 
