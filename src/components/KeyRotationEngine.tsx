@@ -203,7 +203,7 @@ export default function KeyRotationEngine() {
                 {status === "UPLOADING" && "Committing Atomic Transaction..."}
               </div>
               <div style={{ width: "100%", height: "8px", background: "rgba(255,255,255,0.1)", borderRadius: "4px", overflow: "hidden" }}>
-                <div style={{ width: \`\${progress}%\`, height: "100%", background: "var(--accent-blue)", transition: "width 0.3s ease" }} />
+                <div style={{ width: `${progress}%`, height: "100%", background: "var(--accent-blue)", transition: "width 0.3s ease" }} />
               </div>
             </div>
           ) : (
