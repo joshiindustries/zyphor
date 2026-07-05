@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Key, ShieldAlert, Loader2, CheckCircle, AlertTriangle, ArrowRight } from "lucide-react";
-import { deriveKey, encryptTextWithAES, decryptTextWithAES, generateRSAKeyPair } from "@/lib/key-exchange";
+import { deriveKey, encryptTextWithAES, decryptTextWithAES, generateRSAKeyPair } from "@/lib/crypto";
 
 export default function KeyRotationEngine() {
   const [isOpen, setIsOpen] = useState(false);

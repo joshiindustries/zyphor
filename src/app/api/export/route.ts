@@ -13,9 +13,19 @@ export async function GET() {
 
     // Fetch all user data
     const notes = await prisma.note.findMany({ where: { user_id: userId } });
-    const tasks = await prisma.task.findMany({ where: { user_id: userId } });
-    const passwords = await prisma.password.findMany({ where: { user_id: userId } });
-    const events = await prisma.event.findMany({ where: { user_id: userId } });
+    
+    const boards = await prisma.taskBoard.findMany({ 
+      where: { user_id: userId },
+      include: { columns: { include: { tasks: true } } }
+    });
+
+    const passwords = await prisma.passwordEntry.findMany({ where: { user_id: userId } });
+    
+    const calendars = await prisma.eventCalendar.findMany({ 
+      where: { user_id: userId },
+      include: { events: true }
+    });
+
     const vaultFiles = await prisma.vaultFile.findMany({ where: { user_id: userId } });
     const userRecord = await prisma.user.findUnique({ where: { id: userId } });
 
@@ -31,9 +41,9 @@ export async function GET() {
       },
       data: {
         notes,
-        tasks,
+        boards,
         passwords,
-        events,
+        calendars,
         vaultFiles
       }
     };
