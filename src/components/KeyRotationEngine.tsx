@@ -58,8 +58,8 @@ export default function KeyRotationEngine() {
             continue;
           }
           try {
-            const plaintext = await decryptTextWithAES(item[encryptedField], oldVaultKey);
-            const newCiphertext = await encryptTextWithAES(plaintext, newVaultKey);
+            const plaintext = await decryptTextWithAES(oldVaultKey, item[encryptedField]);
+            const newCiphertext = await encryptTextWithAES(newVaultKey, plaintext);
             rotated.push({ ...item, [encryptedField]: newCiphertext });
           } catch (e) {
             console.error(`Failed to rotate item ${item.id}`);
@@ -76,8 +76,8 @@ export default function KeyRotationEngine() {
           for (const field of fields) {
             if (item[field]) {
               try {
-                const plaintext = await decryptTextWithAES(item[field], oldVaultKey);
-                newItem[field] = await encryptTextWithAES(plaintext, newVaultKey);
+                const plaintext = await decryptTextWithAES(oldVaultKey, item[field]);
+                newItem[field] = await encryptTextWithAES(newVaultKey, plaintext);
               } catch (e) {
                 console.error(`Failed to rotate field ${field} on item ${item.id}`);
                 throw new Error(`Incorrect Current Password or corrupted data found.`);
@@ -90,21 +90,21 @@ export default function KeyRotationEngine() {
       };
 
       // Rotate Folders, Files, Boards (single field: encrypted_metadata)
-      const rotatedFolders = await rotateArray(data.folders, "encrypted_metadata");
+      const rotatedFolders = await rotateArray(data.folders, "encrypted_name");
       setProgress(40);
       const rotatedFiles = await rotateArray(data.files, "encrypted_metadata");
       setProgress(50);
-      const rotatedBoards = await rotateArray(data.boards, "encrypted_metadata");
+      const rotatedBoards = await rotateArray(data.boards, "encrypted_title");
       
       // Rotate Notes (encrypted_content)
       const rotatedNotes = await rotateArray(data.notes, "encrypted_content");
       setProgress(60);
 
-      // Rotate Tags (encrypted_name, encrypted_color)
-      const rotatedTags = await rotateMultipleFields(data.tags, ["encrypted_name", "encrypted_color"]);
+      // Rotate Tags (encrypted_name)
+      const rotatedTags = await rotateArray(data.tags, "encrypted_name");
       
-      // Rotate Columns (encrypted_name)
-      const rotatedColumns = await rotateArray(data.columns, "encrypted_name");
+      // Rotate Columns (name)
+      const rotatedColumns = await rotateArray(data.columns, "name");
       
       // Rotate Tasks (encrypted_title, encrypted_description)
       const rotatedTasks = await rotateMultipleFields(data.tasks, ["encrypted_title", "encrypted_description"]);
@@ -113,15 +113,9 @@ export default function KeyRotationEngine() {
       // Rotate Events (encrypted_title, encrypted_description)
       const rotatedEvents = await rotateMultipleFields(data.events, ["encrypted_title", "encrypted_description"]);
 
-      // Rotate Passwords (encrypted_username, encrypted_password, encrypted_notes, encrypted_url)
-      const rotatedPasswords = await rotateMultipleFields(data.passwords, ["encrypted_username", "encrypted_password", "encrypted_notes", "encrypted_url"]);
+      // Rotate Passwords (encrypted_data)
+      const rotatedPasswords = await rotateArray(data.passwords, "encrypted_data");
       setProgress(80);
-
-      // Rotate RSA Keypair
-      // 1. Generate entirely new RSA keypair
-      const newRSA = await generateRSAKeyPair();
-      // 2. Encrypt the private key with the NEW Vault Key
-      const newEncryptedPrivKey = await encryptTextWithAES(newRSA.privateKey, newVaultKey);
 
       const payload = {
         folders: rotatedFolders,
@@ -132,8 +126,7 @@ export default function KeyRotationEngine() {
         columns: rotatedColumns,
         tasks: rotatedTasks,
         events: rotatedEvents,
-        passwords: rotatedPasswords,
-        encrypted_priv_key: newEncryptedPrivKey
+        passwords: rotatedPasswords
       };
 
       setStatus("UPLOADING");
@@ -153,8 +146,6 @@ export default function KeyRotationEngine() {
 
       // Update local storage/session storage to match new state
       sessionStorage.setItem("zyphor_vault_pwd", newPassword);
-      sessionStorage.setItem("zyphor_priv_key", newRSA.privateKey);
-      sessionStorage.setItem("zyphor_pub_key", newRSA.publicKey); // Note: we didn't push public key to DB in this payload. In reality, we must update Public Key on the User record too. Wait!
 
     } catch (err: any) {
       console.error(err);
