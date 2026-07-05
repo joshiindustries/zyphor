@@ -28,7 +28,7 @@ export default function CallClient({
     // 1. Initialize WebRTC
     const rtc = new ZyphorWebRTC(async (type, payload) => {
       // Send signal to API
-      await fetch("/api/calls/signal", {
+      await fetch("/api/calls/signals", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -67,7 +67,7 @@ export default function CallClient({
     // 4. Polling for signals
     const pollSignals = async () => {
       try {
-        const res = await fetch(`/api/calls/signal?callId=${callId}`);
+        const res = await fetch(`/api/calls/signals?callId=${callId}`);
         if (!res.ok) return;
         const data = await res.json();
         

@@ -5,6 +5,7 @@ import { FileText, Star, Trash2, ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { NewNoteButton } from "./NewNoteButton";
 import { NoteGrid } from "./NoteGrid";
+import { NotesClient } from "./NotesClient";
 
 export default async function NotesPage() {
   const sessionUser = await getUser();
@@ -53,7 +54,7 @@ export default async function NotesPage() {
             <h2 style={{ fontSize: "1.5rem", fontWeight: "600" }}>All Notes</h2>
           </div>
 
-          <NoteGrid notes={notes as any} />
+          <NotesClient initialNotes={notes as any} />
         </div>
       </div>
     </main>

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { KanbanSquare, Plus, Lock, ArrowRight, CheckCircle } from "lucide-react";
-import { deriveKeyFromPassword, encryptData, decryptData } from "@/lib/crypto";
+import { deriveKey, encryptTextWithAES, decryptTextWithAES } from "@/lib/crypto";
 import { useRouter } from "next/navigation";
 
 export default function BoardsList() {
@@ -36,13 +36,13 @@ export default function BoardsList() {
       const saltData = await saltRes.json();
       if (!saltData.success) throw new Error("Vault not initialized.");
 
-      const key = await deriveKeyFromPassword(masterPassword, saltData.salt);
+      const key = await deriveKey(masterPassword, saltData.salt);
       
       const validationRes = await fetch("/api/vault/verify");
       const validationData = await validationRes.json();
       
       try {
-        await decryptData(validationData.encrypted_validation, key);
+        await decryptTextWithAES(key, validationData.encrypted_validation);
       } catch (err) {
         throw new Error("Incorrect master password.");
       }
@@ -65,7 +65,7 @@ export default function BoardsList() {
       const decrypted = [];
       for (const b of data.boards) {
         try {
-          const title = await decryptData(b.encrypted_title, key);
+          const title = await decryptTextWithAES(key, b.encrypted_title);
           decrypted.push({ ...b, title });
         } catch (err) {
           decrypted.push({ ...b, title: "Failed to decrypt" });
@@ -80,7 +80,7 @@ export default function BoardsList() {
     if (!masterKey || !newBoardName.trim()) return;
     setLoading(true);
     try {
-      const encryptedTitle = await encryptData(newBoardName, masterKey);
+      const encryptedTitle = await encryptTextWithAES(masterKey, newBoardName);
       const res = await fetch("/api/tasks/boards", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

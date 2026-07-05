@@ -3,11 +3,14 @@
 import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import { ArrowLeft, Lock, Plus, GripVertical, Trash2 } from "lucide-react";
-import { deriveKeyFromPassword, encryptData, decryptData } from "@/lib/crypto";
+import { deriveKey, encryptTextWithAES, decryptTextWithAES } from "@/lib/crypto";
+
+import { useRouter } from "next/navigation";
 
 export default function KanbanBoardPage(props: { params: Promise<{ id: string }> }) {
   const params = use(props.params);
   const boardId = params.id;
+  const router = useRouter();
 
   const [masterPassword, setMasterPassword] = useState("");
   const [masterKey, setMasterKey] = useState<CryptoKey | null>(null);
@@ -42,7 +45,7 @@ export default function KanbanBoardPage(props: { params: Promise<{ id: string }>
       const saltData = await saltRes.json();
       if (!saltData.success) throw new Error("Vault not initialized.");
 
-      const key = await deriveKeyFromPassword(masterPassword, saltData.salt);
+      const key = await deriveKey(masterPassword, saltData.salt);
       setMasterKey(key);
       sessionStorage.setItem("zyphor_vault_pwd", masterPassword);
       await loadBoard(key);
@@ -60,7 +63,7 @@ export default function KanbanBoardPage(props: { params: Promise<{ id: string }>
     if (data.success) {
       const b = data.board;
       try {
-        b.title = await decryptData(b.encrypted_title, key);
+        b.title = await decryptTextWithAES(key, b.encrypted_title);
       } catch {
         b.title = "Failed to decrypt title";
       }
@@ -70,9 +73,9 @@ export default function KanbanBoardPage(props: { params: Promise<{ id: string }>
       for (const col of cols) {
         for (const task of col.tasks) {
           try {
-            task.title = await decryptData(task.encrypted_title, key);
+            task.title = await decryptTextWithAES(key, task.encrypted_title);
             if (task.encrypted_description) {
-              task.description = await decryptData(task.encrypted_description, key);
+              task.description = await decryptTextWithAES(key, task.encrypted_description);
             }
           } catch {
             task.title = "Encrypted Task";
@@ -90,8 +93,8 @@ export default function KanbanBoardPage(props: { params: Promise<{ id: string }>
     
     setLoading(true);
     try {
-      const encryptedTitle = await encryptData(newTaskTitle, masterKey);
-      const encryptedDesc = newTaskDesc.trim() ? await encryptData(newTaskDesc, masterKey) : null;
+      const encryptedTitle = await encryptTextWithAES(masterKey, newTaskTitle);
+      const encryptedDesc = newTaskDesc.trim() ? await encryptTextWithAES(masterKey, newTaskDesc) : null;
 
       const res = await fetch("/api/tasks/items", {
         method: "POST",
@@ -113,6 +116,30 @@ export default function KanbanBoardPage(props: { params: Promise<{ id: string }>
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteBoard = async () => {
+    if (!confirm("Are you sure you want to delete this entire board? This cannot be undone.")) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/tasks/boards/${boardId}`, { method: "DELETE" });
+      if (res.ok) {
+        router.push("/dashboard/tasks");
+      }
+    } catch (err) {
+      console.error(err);
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteTask = async (taskId: string) => {
+    if (!confirm("Delete this task?")) return;
+    try {
+      await fetch(`/api/tasks/items?taskId=${taskId}`, { method: "DELETE" });
+      if (masterKey) loadBoard(masterKey);
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -206,9 +233,14 @@ export default function KanbanBoardPage(props: { params: Promise<{ id: string }>
             <Lock size={12} /> E2EE Active
           </p>
         </div>
-        <Link href="/dashboard/tasks" className="btn btn-secondary" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <ArrowLeft size={16} /> All Boards
-        </Link>
+        <div style={{ display: "flex", gap: "1rem" }}>
+          <button className="btn btn-secondary" onClick={handleDeleteBoard} disabled={loading} style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "var(--accent-red)", borderColor: "var(--accent-red)" }}>
+            <Trash2 size={16} /> Delete Board
+          </button>
+          <Link href="/dashboard/tasks" className="btn btn-secondary" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <ArrowLeft size={16} /> All Boards
+          </Link>
+        </div>
       </header>
 
       <div style={{ flex: 1, display: "flex", gap: "1.5rem", padding: "2rem", overflowX: "auto", alignItems: "flex-start" }}>
@@ -251,6 +283,14 @@ export default function KanbanBoardPage(props: { params: Promise<{ id: string }>
                         <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{task.description}</p>
                       )}
                     </div>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id); }}
+                      style={{ background: "transparent", border: "none", color: "var(--text-secondary)", cursor: "pointer", padding: "0.2rem" }}
+                      className="hover:text-red-500 transition-colors"
+                      title="Delete Task"
+                    >
+                      <Trash2 size={14} />
+                    </button>
                   </div>
                 </div>
               ))}

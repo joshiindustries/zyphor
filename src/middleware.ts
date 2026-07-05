@@ -8,6 +8,12 @@ const CSRF_PROTECTED_PREFIXES = [
   "/api/profile",
   "/api/webrtc",
   "/api/auth/register",
+  "/api/tasks",
+  "/api/calendars",
+  "/api/vault",
+  "/api/calls",
+  "/api/groups",
+  "/api/notes",
 ];
 
 function isCsrfProtectedPath(pathname: string): boolean {

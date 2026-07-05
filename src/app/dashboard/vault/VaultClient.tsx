@@ -198,8 +198,54 @@ export function VaultClient({ initialFiles }: { initialFiles: any[] }) {
     }
   };
 
+  const handleTrash = async (fileRec: any) => {
+    try {
+      const res = await fetch(`/api/vault/files`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: fileRec.id, is_trashed: true })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setFiles(files.map(f => f.id === fileRec.id ? data.file : f));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleRestore = async (fileRec: any) => {
+    try {
+      const res = await fetch(`/api/vault/files`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: fileRec.id, is_trashed: false })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setFiles(files.map(f => f.id === fileRec.id ? data.file : f));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDeletePermanent = async (fileRec: any) => {
+    if (!confirm("Are you sure you want to permanently delete this file? This cannot be undone.")) return;
+    try {
+      const res = await fetch(`/api/vault/files?id=${fileRec.id}`, {
+        method: "DELETE"
+      });
+      if (res.ok) {
+        setFiles(files.filter(f => f.id !== fileRec.id));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const filteredFiles = files.filter(f => {
-    if (currentFilter === "FAVORITES") return f.is_favorite;
+    if (currentFilter === "FAVORITES") return f.is_favorite && !f.is_trashed;
     if (currentFilter === "TRASH") return f.is_trashed;
     return !f.is_trashed;
   });
@@ -280,9 +326,11 @@ export function VaultClient({ initialFiles }: { initialFiles: any[] }) {
               
               return (
                 <div key={f.id} style={{ background: "var(--glass-bg)", border: "1px solid var(--glass-border)", borderRadius: "var(--radius-md)", padding: "1.5rem", display: "flex", flexDirection: "column", alignItems: "center", position: "relative" }}>
-                  <button onClick={() => toggleFavorite(f)} style={{ position: "absolute", top: "10px", right: "10px", background: "none", border: "none", cursor: "pointer", color: f.is_favorite ? "var(--accent-purple)" : "var(--text-secondary)" }}>
-                    <Star size={18} fill={f.is_favorite ? "var(--accent-purple)" : "none"} />
-                  </button>
+                  {currentFilter !== "TRASH" && (
+                    <button onClick={() => toggleFavorite(f)} style={{ position: "absolute", top: "10px", right: "10px", background: "none", border: "none", cursor: "pointer", color: f.is_favorite ? "var(--accent-purple)" : "var(--text-secondary)" }}>
+                      <Star size={18} fill={f.is_favorite ? "var(--accent-purple)" : "none"} />
+                    </button>
+                  )}
                   
                   <div style={{ cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center" }} onClick={() => handlePreview(f)}>
                     <FileIcon size={48} color="var(--text-secondary)" style={{ marginBottom: "1rem" }} />
@@ -290,12 +338,25 @@ export function VaultClient({ initialFiles }: { initialFiles: any[] }) {
                   </div>
                   
                   <div style={{ display: "flex", gap: "0.5rem", marginTop: "auto" }}>
-                    <button className="btn btn-secondary" onClick={() => handleDownload(f)} style={{ padding: "0.4rem", display: "flex", alignItems: "center" }} title="Download">
-                      <Download size={16} />
-                    </button>
-                    <button className="btn btn-secondary" style={{ padding: "0.4rem", display: "flex", alignItems: "center", color: "#e74c3c" }} title="Trash">
-                      <Trash size={16} />
-                    </button>
+                    {currentFilter === "TRASH" ? (
+                      <>
+                        <button className="btn btn-secondary" onClick={() => handleRestore(f)} style={{ padding: "0.4rem 0.8rem", display: "flex", alignItems: "center", fontSize: "0.8rem", flex: 1, justifyContent: "center" }} title="Restore">
+                          Restore
+                        </button>
+                        <button className="btn btn-secondary" onClick={() => handleDeletePermanent(f)} style={{ padding: "0.4rem 0.8rem", display: "flex", alignItems: "center", color: "#e74c3c", fontSize: "0.8rem", flex: 1, justifyContent: "center" }} title="Delete Permanently">
+                          Delete
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button className="btn btn-secondary" onClick={() => handleDownload(f)} style={{ padding: "0.4rem", display: "flex", alignItems: "center" }} title="Download">
+                          <Download size={16} />
+                        </button>
+                        <button className="btn btn-secondary" onClick={() => handleTrash(f)} style={{ padding: "0.4rem", display: "flex", alignItems: "center", color: "#e74c3c" }} title="Trash">
+                          <Trash size={16} />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               );

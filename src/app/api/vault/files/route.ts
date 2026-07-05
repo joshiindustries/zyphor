@@ -116,3 +116,36 @@ export async function PATCH(request: NextRequest) {
     return noStoreJson({ error: "Internal server error" }, { status: 500 });
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const user = await getUser();
+    if (!user) {
+      return noStoreJson({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const fileId = searchParams.get("id");
+
+    if (!fileId) {
+      return noStoreJson({ error: "File ID required" }, { status: 400 });
+    }
+
+    const file = await prisma.vaultFile.findUnique({
+      where: { id: fileId }
+    });
+
+    if (!file || file.user_id !== user.id) {
+      return noStoreJson({ error: "File not found or forbidden" }, { status: 404 });
+    }
+
+    await prisma.vaultFile.delete({
+      where: { id: fileId }
+    });
+
+    return noStoreJson({ success: true });
+  } catch (error) {
+    console.error("Error deleting file:", error);
+    return noStoreJson({ error: "Internal server error" }, { status: 500 });
+  }
+}

@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { Key, Plus, Search, ShieldAlert, Copy, CheckCircle, Lock, RefreshCw, AlertTriangle, Eye, EyeOff, Trash2 } from "lucide-react";
-import { deriveKeyFromPassword, encryptData, decryptData } from "@/lib/crypto";
+import { deriveKey, encryptTextWithAES, decryptTextWithAES } from "@/lib/crypto";
+import TOTPDisplay from "@/components/TOTPDisplay";
 
 export default function PasswordsDashboard() {
   const [masterPassword, setMasterPassword] = useState("");
@@ -17,7 +18,7 @@ export default function PasswordsDashboard() {
 
   // Modal State
   const [isAdding, setIsAdding] = useState(false);
-  const [newEntry, setNewEntry] = useState({ title: "", username: "", password: "", url: "", notes: "" });
+  const [newEntry, setNewEntry] = useState({ title: "", username: "", password: "", url: "", notes: "", totpSecret: "" });
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
@@ -40,14 +41,14 @@ export default function PasswordsDashboard() {
       if (!saltData.success) throw new Error("Vault not initialized. Go to Vault first.");
 
       // 2. Derive key
-      const key = await deriveKeyFromPassword(masterPassword, saltData.salt);
+      const key = await deriveKey(masterPassword, saltData.salt);
       
       // 3. Test decrypting the validation check
       const validationRes = await fetch("/api/vault/verify");
       const validationData = await validationRes.json();
       
       try {
-        await decryptData(validationData.encrypted_validation, key);
+        await decryptTextWithAES(key, validationData.encrypted_validation);
       } catch (err) {
         throw new Error("Incorrect master password.");
       }
@@ -69,7 +70,7 @@ export default function PasswordsDashboard() {
       const decrypted = [];
       for (const p of data.passwords) {
         try {
-          const dec = await decryptData(p.encrypted_data, key);
+          const dec = await decryptTextWithAES(key, p.encrypted_data);
           const parsed = JSON.parse(dec);
           decrypted.push({ id: p.id, ...parsed, created_at: p.created_at });
         } catch (err) {
@@ -112,7 +113,7 @@ export default function PasswordsDashboard() {
 
     try {
       const payload = JSON.stringify(newEntry);
-      const encryptedData = await encryptData(payload, masterKey);
+      const encryptedData = await encryptTextWithAES(masterKey, payload);
 
       const res = await fetch("/api/passwords", {
         method: "POST",
@@ -122,7 +123,7 @@ export default function PasswordsDashboard() {
 
       if (res.ok) {
         setIsAdding(false);
-        setNewEntry({ title: "", username: "", password: "", url: "", notes: "" });
+        setNewEntry({ title: "", username: "", password: "", url: "", notes: "", totpSecret: "" });
         await loadPasswords(masterKey);
       }
     } catch (err) {
@@ -262,7 +263,8 @@ export default function PasswordsDashboard() {
                 
                 <div style={{ flex: 1 }}>
                   <h3 style={{ fontSize: "1.1rem", fontWeight: "600", marginBottom: "0.25rem" }}>{p.title}</h3>
-                  <div style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>{p.username}</div>
+                  <div style={{ fontSize: "0.85rem", color: "var(--text-secondary)", marginBottom: p.totpSecret ? "0.5rem" : "0" }}>{p.username}</div>
+                  {p.totpSecret && <TOTPDisplay secret={p.totpSecret} />}
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -310,6 +312,11 @@ export default function PasswordsDashboard() {
               </div>
 
               <textarea className="input-field" placeholder="Notes (Optional)" value={newEntry.notes} onChange={e => setNewEntry({...newEntry, notes: e.target.value})} style={{ minHeight: "80px", resize: "vertical" }} />
+              
+              <div style={{ borderTop: "1px solid var(--glass-border)", paddingTop: "1rem", marginTop: "0.5rem" }}>
+                <h4 style={{ fontSize: "0.95rem", fontWeight: "600", marginBottom: "0.5rem", color: "var(--text-secondary)" }}>Two-Factor Authentication (Optional)</h4>
+                <input className="input-field" placeholder="TOTP Secret / Setup Key (Base32)" value={newEntry.totpSecret} onChange={e => setNewEntry({...newEntry, totpSecret: e.target.value})} style={{ width: "100%" }} />
+              </div>
 
               <div style={{ display: "flex", justifyContent: "flex-end", gap: "1rem", marginTop: "1rem" }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setIsAdding(false)}>Cancel</button>

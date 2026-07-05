@@ -36,3 +36,31 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
     return noStoreJson({ error: "Internal server error" }, { status: 500 });
   }
 }
+
+export async function DELETE(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  try {
+    const user = await getUser();
+    if (!user) {
+      return noStoreJson({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await props.params;
+
+    const board = await prisma.taskBoard.findUnique({
+      where: { id }
+    });
+
+    if (!board || board.user_id !== user.id) {
+      return noStoreJson({ error: "Not found" }, { status: 404 });
+    }
+
+    await prisma.taskBoard.delete({
+      where: { id }
+    });
+
+    return noStoreJson({ success: true });
+  } catch (error) {
+    console.error("Error deleting board:", error);
+    return noStoreJson({ error: "Internal server error" }, { status: 500 });
+  }
+}

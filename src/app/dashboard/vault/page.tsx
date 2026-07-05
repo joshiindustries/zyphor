@@ -13,7 +13,7 @@ export default async function VaultPage() {
   }
 
   const initialFiles = await prisma.vaultFile.findMany({
-    where: { user_id: sessionUser.id, is_trashed: false },
+    where: { user_id: sessionUser.id },
     orderBy: { created_at: "desc" }
   });
 

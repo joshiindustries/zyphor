@@ -9,7 +9,8 @@
     "build": "prisma generate && prisma db push --accept-data-loss && next build",
     "postinstall": "prisma generate",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "db:push": "prisma db push"
   },
   "dependencies": {
     "@marsidev/react-turnstile": "^1.4.2",
@@ -18,7 +19,7 @@
     "better-sqlite3": "^11.1.2",
     "framer-motion": "^12.42.2",
     "lucide-react": "^0.412.0",
-    "next": "^16.2.6",
+    "next": "^14.2.5",
     "next-auth": "^4.24.14",
     "pg": "^8.21.0",
     "react": "^18.0.0",
@@ -29,8 +30,8 @@
     "@types/node": "^20",
     "@types/react": "^18.0.0",
     "@types/react-dom": "^18.0.0",
-    "eslint": "^9.39.4",
-    "eslint-config-next": "^16.2.6",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "^14.2.5",
     "prisma": "^7.8.0",
     "typescript": "^5.0.0"
   }

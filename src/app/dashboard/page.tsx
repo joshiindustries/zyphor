@@ -2,7 +2,7 @@ import { getUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Globe, FileText, CheckSquare, Calendar, Video, Key } from "lucide-react";
+import { Globe, FileText, CheckSquare, Calendar, Video, Key, Folder, Shield, Box } from "lucide-react";
 import LinkCard from "./LinkCard";
 import LogoutButton from "@/components/LogoutButton";
 import UserAvatar from "@/components/UserAvatar";
@@ -147,11 +147,35 @@ export default async function DashboardPage() {
               </div>
               <span style={{ fontWeight: "600" }}>Device Keys</span>
             </Link>
+            <Link href="/dashboard/passwords" className="glass-panel" style={{ textDecoration: "none", color: "inherit", padding: "1.5rem", borderRadius: "var(--radius-lg)", display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem", transition: "all 0.2s" }}>
+              <div style={{ background: "rgba(231, 76, 60, 0.1)", padding: "1rem", borderRadius: "50%" }}>
+                <Key size={32} color="#e74c3c" />
+              </div>
+              <span style={{ fontWeight: "600" }}>Passwords</span>
+            </Link>
+            <Link href="/dashboard/vault" className="glass-panel" style={{ textDecoration: "none", color: "inherit", padding: "1.5rem", borderRadius: "var(--radius-lg)", display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem", transition: "all 0.2s" }}>
+              <div style={{ background: "rgba(16, 185, 129, 0.1)", padding: "1rem", borderRadius: "50%" }}>
+                <Folder size={32} color="#10b981" />
+              </div>
+              <span style={{ fontWeight: "600" }}>Cloud Vault</span>
+            </Link>
+            <Link href="/dashboard/security" className="glass-panel" style={{ textDecoration: "none", color: "inherit", padding: "1.5rem", borderRadius: "var(--radius-lg)", display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem", transition: "all 0.2s" }}>
+              <div style={{ background: "rgba(142, 68, 173, 0.1)", padding: "1rem", borderRadius: "50%" }}>
+                <Shield size={32} color="#8e44ad" />
+              </div>
+              <span style={{ fontWeight: "600" }}>Security Center</span>
+            </Link>
+            <Link href="/dashboard/drop" className="glass-panel" style={{ textDecoration: "none", color: "inherit", padding: "1.5rem", borderRadius: "var(--radius-lg)", display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem", transition: "all 0.2s" }}>
+              <div style={{ background: "rgba(59, 130, 246, 0.1)", padding: "1rem", borderRadius: "50%" }}>
+                <Box size={32} color="#3b82f6" />
+              </div>
+              <span style={{ fontWeight: "600" }}>Drop Inbox</span>
+            </Link>
           </div>
         </section>
 
         <div className="dashboard-title-bar">
-          <h2 style={{ fontSize: "1.5rem", fontWeight: "700" }}>Your Vault</h2>
+          <h2 style={{ fontSize: "1.5rem", fontWeight: "700" }}>Secure Transfers</h2>
           <Link href="/" className="btn btn-primary">+ New Transfer</Link>
         </div>
 

@@ -1,7 +1,10 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Shield, ShieldAlert, Monitor, CheckCircle, AlertTriangle, Key, Clock, Settings, Laptop, Smartphone, Trash2, Link, Upload, Loader2, X } from "lucide-react"
+import { Shield, ShieldAlert, Monitor, CheckCircle, AlertTriangle, Key, Clock, Settings, Laptop, Smartphone, Trash2, Link as LinkIcon, Upload, Loader2, X, Download, EyeOff } from "lucide-react"
+import DuressManager from "@/components/DuressManager";
+import ZyphorImporter from "@/components/ZyphorImporter";
+import KeyRotationEngine from "@/components/KeyRotationEngine";
 
 export default function SecurityDashboard() {
   const [data, setData] = useState<any>(null);
@@ -247,6 +250,12 @@ export default function SecurityDashboard() {
           )}
         </div>
 
+        {/* Duress Manager Card */}
+        <DuressManager />
+
+        {/* Master Key Rotation Engine */}
+        <KeyRotationEngine />
+
         {/* Link Scanner Card */}
         <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--glass-border)", borderRadius: "var(--radius-md)", padding: "1.5rem" }}>
           <h3 style={{ fontSize: "1.2rem", fontWeight: "600", marginBottom: "0.5rem" }}>Link Scanner</h3>
@@ -285,6 +294,31 @@ export default function SecurityDashboard() {
             </div>
           )}
         </div>
+
+        {/* Zyphor Takeout / Export Card */}
+        <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--glass-border)", borderRadius: "var(--radius-md)", padding: "1.5rem" }}>
+          <h3 style={{ fontSize: "1.2rem", fontWeight: "600", marginBottom: "0.5rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <Download size={20} color="var(--accent-blue)" /> Zyphor Takeout
+          </h3>
+          <p style={{ color: "var(--text-secondary)", marginBottom: "1rem" }}>Download a complete, encrypted JSON backup of your Vault, Notes, Tasks, and Passwords.</p>
+          <a href="/api/export" download className="btn btn-primary" style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", background: "var(--accent-blue)", color: "#fff", textDecoration: "none" }}>
+            <Download size={16} /> Export Encrypted Backup
+          </a>
+        </div>
+
+        {/* Steganography Engine Card */}
+        <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--glass-border)", borderRadius: "var(--radius-md)", padding: "1.5rem" }}>
+          <h3 style={{ fontSize: "1.2rem", fontWeight: "600", marginBottom: "0.5rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <EyeOff size={20} color="#10b981" /> Steganography Engine
+          </h3>
+          <p style={{ color: "var(--text-secondary)", marginBottom: "1rem" }}>Covertly encode and hide encrypted text payloads inside standard image files (PNG/JPEG).</p>
+          <a href="/dashboard/security/steganography" className="btn btn-primary" style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", background: "#10b981", color: "#000", fontWeight: "700", textDecoration: "none" }}>
+            <EyeOff size={16} /> Open Engine
+          </a>
+        </div>
+
+        {/* Zyphor Importer Card */}
+        <ZyphorImporter />
       </div>
 
       {/* Login History */}

@@ -80,3 +80,42 @@ export async function POST(request: NextRequest) {
     return noStoreJson({ error: "Internal server error" }, { status: 500 });
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const user = await getUser();
+    if (!user) {
+      return noStoreJson({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return noStoreJson({ error: "Message ID is required" }, { status: 400 });
+    }
+
+    // Must verify the user has access to this message's conversation
+    const message = await prisma.message.findUnique({
+      where: { id },
+      include: { conversation: true }
+    });
+
+    if (!message) {
+      return noStoreJson({ error: "Message not found" }, { status: 404 });
+    }
+
+    if (message.conversation.user1_id !== user.id && message.conversation.user2_id !== user.id) {
+      return noStoreJson({ error: "Access denied" }, { status: 403 });
+    }
+
+    await prisma.message.delete({
+      where: { id }
+    });
+
+    return noStoreJson({ success: true });
+  } catch (error) {
+    console.error("Error deleting message:", error);
+    return noStoreJson({ error: "Internal server error" }, { status: 500 });
+  }
+}

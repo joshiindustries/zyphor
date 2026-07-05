@@ -2,8 +2,149 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, MessageSquare, Plus, Lock, Send, Users } from "lucide-react";
+import { ArrowLeft, MessageSquare, Plus, Lock, Send, Users, Video, Edit2, Trash2, Reply, Smile, X, Paperclip, Flame } from "lucide-react";
 import { encryptMessage, decryptMessage } from "@/lib/key-exchange";
+
+function AttachmentRenderer({ attachment }: { attachment: any }) {
+  const [decryptedUrl, setDecryptedUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleDownload = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(attachment.url);
+      const encryptedBuffer = await res.arrayBuffer();
+      
+      const rawKey = new Uint8Array(window.atob(attachment.aesKey).split("").map(c => c.charCodeAt(0)));
+      const aesKey = await window.crypto.subtle.importKey(
+        "raw", rawKey, { name: "AES-GCM" }, false, ["decrypt"]
+      );
+      
+      const iv = new Uint8Array(window.atob(attachment.iv).split("").map(c => c.charCodeAt(0)));
+      
+      const decryptedBuffer = await window.crypto.subtle.decrypt(
+        { name: "AES-GCM", iv },
+        aesKey,
+        encryptedBuffer
+      );
+      
+      const blob = new Blob([decryptedBuffer], { type: attachment.type });
+      const url = URL.createObjectURL(blob);
+      setDecryptedUrl(url);
+    } catch (err) {
+      console.error("Decryption failed", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (attachment.type.startsWith("image/") || attachment.type.startsWith("video/")) {
+      handleDownload();
+    }
+  }, []);
+
+  if (attachment.type.startsWith("image/")) {
+    return decryptedUrl ? (
+      <img src={decryptedUrl} alt={attachment.name} style={{ maxWidth: "300px", borderRadius: "8px", marginTop: "0.5rem" }} />
+    ) : (
+      <div style={{ padding: "1rem", background: "rgba(0,0,0,0.2)", borderRadius: "8px", marginTop: "0.5rem", fontSize: "0.8rem", color: "var(--text-secondary)" }}>
+        {loading ? "Decrypting image..." : "Loading image..."}
+      </div>
+    );
+  }
+  
+  if (attachment.type.startsWith("video/")) {
+    return decryptedUrl ? (
+      <video src={decryptedUrl} controls style={{ maxWidth: "300px", borderRadius: "8px", marginTop: "0.5rem" }} />
+    ) : (
+      <div style={{ padding: "1rem", background: "rgba(0,0,0,0.2)", borderRadius: "8px", marginTop: "0.5rem", fontSize: "0.8rem", color: "var(--text-secondary)" }}>
+        {loading ? "Decrypting video..." : "Loading video..."}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ padding: "0.75rem", background: "rgba(0,0,0,0.2)", borderRadius: "8px", marginTop: "0.5rem", display: "flex", alignItems: "center", gap: "1rem" }}>
+      <div style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "0.85rem" }}>
+        📎 {attachment.name}
+      </div>
+      {decryptedUrl ? (
+        <a href={decryptedUrl} download={attachment.name} className="btn btn-secondary" style={{ padding: "0.25rem 0.5rem", fontSize: "0.8rem", textDecoration: "none", color: "#fff", border: "1px solid var(--glass-border)" }}>Download</a>
+      ) : (
+        <button onClick={handleDownload} disabled={loading} className="btn btn-secondary" style={{ padding: "0.25rem 0.5rem", fontSize: "0.8rem", background: "transparent", color: "#fff", border: "1px solid var(--glass-border)", cursor: "pointer" }}>
+          {loading ? "Decrypting..." : "Decrypt & Download"}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function MessageContentRenderer({ msg, isMe }: { msg: any, isMe: boolean }) {
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const [isBurned, setIsBurned] = useState(false);
+
+  useEffect(() => {
+    if (msg.is_deleted || isBurned) return;
+
+    let displayMsg = msg.encrypted_content;
+    if (displayMsg.startsWith("ENC_GROUP:")) displayMsg = window.atob(displayMsg.split(":")[1]);
+    
+    let parsed: any = null;
+    try { parsed = JSON.parse(displayMsg); } catch (e) {}
+
+    if (parsed && parsed.viewOnce && !isMe) {
+      // Fire delete to server immediately
+      fetch(`/api/chat/messages?id=${msg.id}`, { method: 'DELETE' }).catch(console.error);
+      
+      setTimeLeft(15);
+      const timer = setInterval(() => {
+        setTimeLeft(prev => {
+          if (prev && prev <= 1) {
+            clearInterval(timer);
+            setIsBurned(true);
+            return 0;
+          }
+          return prev ? prev - 1 : 0;
+        });
+      }, 1000);
+
+      return () => clearInterval(timer);
+    }
+  }, [msg, isMe, isBurned]);
+
+  if (isBurned) {
+    return <div style={{ fontStyle: "italic", opacity: 0.7, color: "var(--accent-red)" }}>🔥 Message self-destructed</div>;
+  }
+
+  if (msg.is_deleted) {
+    return <div style={{ fontStyle: "italic", opacity: 0.7 }}>🚫 This message was deleted</div>;
+  }
+  
+  let displayMsg = msg.encrypted_content;
+  if (displayMsg.startsWith("ENC_GROUP:")) displayMsg = window.atob(displayMsg.split(":")[1]);
+  
+  let parsed: any = null;
+  try { parsed = JSON.parse(displayMsg); } catch (e) {}
+
+  return (
+    <div>
+      {parsed && parsed.viewOnce && (
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "var(--accent-red)", fontSize: "0.8rem", marginBottom: "0.5rem", fontWeight: "bold", background: "rgba(239, 68, 68, 0.1)", padding: "0.25rem 0.5rem", borderRadius: "4px" }}>
+          <Flame size={14} className="animate-pulse" /> View Once {timeLeft !== null && !isMe && `(${timeLeft}s)`}
+        </div>
+      )}
+      {parsed && typeof parsed === "object" ? (
+        <>
+          {parsed.text && <div>{parsed.text}</div>}
+          {parsed.attachment && <AttachmentRenderer attachment={parsed.attachment} />}
+        </>
+      ) : (
+        displayMsg.length > 50 && displayMsg.includes("encryptedContent") ? "<Encrypted Payload>" : displayMsg
+      )}
+    </div>
+  );
+}
 
 export default function ChatClient({ 
   sessionUser, 
@@ -34,6 +175,18 @@ export default function ChatClient({
   const [groupSearchQuery, setGroupSearchQuery] = useState("");
   const [groupSearchResults, setGroupSearchResults] = useState<any[]>([]);
   const [selectedGroupMembers, setSelectedGroupMembers] = useState<any[]>([]);
+
+  // Advanced Messaging States
+  const [replyingTo, setReplyingTo] = useState<any>(null);
+  const [editingMsg, setEditingMsg] = useState<any>(null);
+  const [hoveredMsgId, setHoveredMsgId] = useState<string | null>(null);
+
+  // Attachments State
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [attachment, setAttachment] = useState<any>(null);
+
+  const [isBurnerMode, setIsBurnerMode] = useState(false);
 
   // User Search effect
   useEffect(() => {
@@ -69,7 +222,6 @@ export default function ChatClient({
         if (res.ok) {
           const data = await res.json();
           if (data.success && data.calls.length > 0) {
-            // Find a call where we are NOT the caller
             const incoming = data.calls.find((c: any) => c.caller_id !== sessionUser.id && c.status === "RINGING");
             setActiveCall(incoming || null);
           } else {
@@ -102,7 +254,7 @@ export default function ChatClient({
     };
 
     const fetchKey = async () => {
-      if (activeType === "group") return; // Group keys are handled differently
+      if (activeType === "group") return; 
       const activeConv = initialConversations.find((c: any) => c.id === activeId);
       if (!activeConv) return;
       const otherUserId = activeConv.user1_id === sessionUser.id ? activeConv.user2_id : activeConv.user1_id;
@@ -129,42 +281,56 @@ export default function ChatClient({
 
     setLoading(true);
     try {
+      const payloadObj = {
+        text: inputText,
+        attachment: attachment,
+        viewOnce: isBurnerMode
+      };
+      const plaintextPayload = JSON.stringify(payloadObj);
+
+      let encryptedPayload = "";
       if (activeType === "dm") {
         if (!recipientPublicKey) throw new Error("Missing recipient public key");
-        const encryptedPayload = await encryptMessage(inputText, recipientPublicKey);
-        
-        const res = await fetch("/api/chat/messages", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            conversation_id: activeId,
-            encrypted_content: encryptedPayload
-          })
-        });
+        encryptedPayload = await encryptMessage(plaintextPayload, recipientPublicKey);
+      } else {
+        encryptedPayload = "ENC_GROUP:" + btoa(plaintextPayload); 
+      }
 
+      if (editingMsg) {
+        // Edit Message
+        const url = activeType === "dm" ? `/api/chat/messages/${editingMsg.id}` : `/api/groups/messages/${editingMsg.id}`;
+        const res = await fetch(url, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ encrypted_content: encryptedPayload })
+        });
         const data = await res.json();
         if (data.success) {
-          setMessages([...messages, data.message]);
+          setMessages(messages.map(m => m.id === editingMsg.id ? data.message : m));
+          setEditingMsg(null);
           setInputText("");
         }
       } else {
-        // Group Chat Encryption
-        // In reality, you'd encrypt with the symmetric Group Key
-        const encryptedPayload = "ENC_GROUP:" + btoa(inputText); // Mock
-        
-        const res = await fetch("/api/groups/messages", {
+        // Send New Message
+        const url = activeType === "dm" ? "/api/chat/messages" : "/api/groups/messages";
+        const body: any = { encrypted_content: encryptedPayload };
+        if (activeType === "dm") body.conversation_id = activeId;
+        else body.group_id = activeId;
+
+        if (replyingTo) body.reply_to_id = replyingTo.id;
+
+        const res = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            group_id: activeId,
-            encrypted_content: encryptedPayload
-          })
+          body: JSON.stringify(body)
         });
 
         const data = await res.json();
         if (data.success) {
           setMessages([...messages, data.message]);
+          setReplyingTo(null);
           setInputText("");
+          setAttachment(null);
         }
       }
     } catch (error) {
@@ -174,12 +340,125 @@ export default function ChatClient({
     }
   };
 
+  const handleDelete = async (msgId: string) => {
+    try {
+      const url = activeType === "dm" ? `/api/chat/messages/${msgId}` : `/api/groups/messages/${msgId}`;
+      const res = await fetch(url, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_deleted: true })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setMessages(messages.map(m => m.id === msgId ? data.message : m));
+      }
+    } catch (err) {
+      console.error("Failed to delete", err);
+    }
+  };
+
+  const handleReact = async (msg: any, emoji: string) => {
+    try {
+      // Decode existing reactions or create new
+      let currentReactions: Record<string, string[]> = {};
+      if (msg.reactions && !msg.reactions.startsWith("ENC_GROUP:")) {
+        try {
+          // Decrypting reactions (mock base64 for now, real app would use AES)
+          currentReactions = JSON.parse(atob(msg.reactions));
+        } catch (e) {}
+      } else if (msg.reactions && msg.reactions.startsWith("ENC_GROUP:")) {
+        try {
+          currentReactions = JSON.parse(atob(msg.reactions.split(":")[1]));
+        } catch (e) {}
+      }
+
+      if (!currentReactions[emoji]) currentReactions[emoji] = [];
+      
+      const userIndex = currentReactions[emoji].indexOf(sessionUser.id);
+      if (userIndex > -1) {
+        currentReactions[emoji].splice(userIndex, 1); // toggle off
+        if (currentReactions[emoji].length === 0) delete currentReactions[emoji];
+      } else {
+        currentReactions[emoji].push(sessionUser.id);
+      }
+
+      const stringified = JSON.stringify(currentReactions);
+      const encryptedReactions = activeType === "group" ? "ENC_GROUP:" + btoa(stringified) : btoa(stringified); // MOCK encryption for DMs
+
+      const url = activeType === "dm" ? `/api/chat/messages/${msg.id}` : `/api/groups/messages/${msg.id}`;
+      const res = await fetch(url, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reactions: encryptedReactions })
+      });
+      
+      const data = await res.json();
+      if (data.success) {
+        setMessages(messages.map(m => m.id === msg.id ? data.message : m));
+      }
+    } catch (err) {
+      console.error("Failed to react", err);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingFile(true);
+    try {
+      const aesKey = await window.crypto.subtle.generateKey(
+        { name: "AES-GCM", length: 256 },
+        true,
+        ["encrypt", "decrypt"]
+      );
+      const iv = window.crypto.getRandomValues(new Uint8Array(12));
+      
+      const arrayBuffer = await file.arrayBuffer();
+      
+      const encryptedContent = await window.crypto.subtle.encrypt(
+        { name: "AES-GCM", iv },
+        aesKey,
+        arrayBuffer
+      );
+      
+      const blob = new Blob([encryptedContent], { type: "application/octet-stream" });
+      const formData = new FormData();
+      formData.append("file", blob, file.name); 
+      
+      const res = await fetch("/api/chat/attachments", {
+        method: "POST",
+        body: formData
+      });
+      const data = await res.json();
+      
+      if (data.url) {
+        const rawAesKey = await window.crypto.subtle.exportKey("raw", aesKey);
+        const aesKeyB64 = window.btoa(String.fromCharCode(...new Uint8Array(rawAesKey)));
+        const ivB64 = window.btoa(String.fromCharCode(...new Uint8Array(iv)));
+        
+        setAttachment({
+          url: data.url,
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          aesKey: aesKeyB64,
+          iv: ivB64
+        });
+      }
+    } catch (err) {
+      console.error("Upload failed", err);
+    } finally {
+      setUploadingFile(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   const handleCreateGroup = async () => {
     if (!newGroupName.trim() || selectedGroupMembers.length === 0) return;
     
     setLoading(true);
     try {
-      // Fetch public keys for selected members to mock the group key sharing
       const members = [{ user_id: sessionUser.id, encrypted_key: "MOCK_KEY" }];
       
       for (const member of selectedGroupMembers) {
@@ -241,7 +520,6 @@ export default function ChatClient({
           </div>
           <div style={{ display: "flex", gap: "0.5rem" }}>
             <button className="btn btn-secondary" style={{ background: "rgba(0,0,0,0.2)", border: "none", color: "#fff" }} onClick={async () => {
-              // Decline
               await fetch("/api/calls", {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
@@ -422,12 +700,8 @@ export default function ChatClient({
                         const data = await res.json();
                         if (data.success && data.call) {
                           window.location.href = `/chat/call/${data.call.id}`;
-                        } else {
-                          alert(data.error || "Failed to initiate call");
                         }
-                      } catch (err) {
-                        console.error(err);
-                      }
+                      } catch (err) {}
                     }}
                   >
                     <Video size={16} /> Video Call
@@ -446,13 +720,68 @@ export default function ChatClient({
                 ) : (
                   messages.map(msg => {
                     const isMe = msg.sender_id === sessionUser.id;
-                    let displayMsg = msg.encrypted_content;
-                    if (displayMsg.startsWith("ENC_GROUP:")) displayMsg = atob(displayMsg.split(":")[1]);
+                    const parentMsg = msg.reply_to_id ? messages.find(m => m.id === msg.reply_to_id) : null;
+
+                    // Parse reactions
+                    let reactionsObj: Record<string, string[]> = {};
+                    if (msg.reactions && !msg.reactions.startsWith("ENC_GROUP:")) {
+                      try { reactionsObj = JSON.parse(atob(msg.reactions)); } catch (e) {}
+                    } else if (msg.reactions && msg.reactions.startsWith("ENC_GROUP:")) {
+                      try { reactionsObj = JSON.parse(atob(msg.reactions.split(":")[1])); } catch (e) {}
+                    }
 
                     return (
-                      <div key={msg.id} style={{ display: "flex", flexDirection: "column", alignItems: isMe ? "flex-end" : "flex-start", maxWidth: "80%", alignSelf: isMe ? "flex-end" : "flex-start" }}>
-                        <div style={{ background: isMe ? "var(--accent-blue)" : "var(--glass-bg)", border: isMe ? "none" : "1px solid var(--glass-border)", padding: "0.75rem 1rem", borderRadius: "var(--radius-md)", color: "#fff", position: "relative" }}>
-                          {displayMsg}
+                      <div 
+                        key={msg.id} 
+                        style={{ display: "flex", flexDirection: "column", alignItems: isMe ? "flex-end" : "flex-start", maxWidth: "80%", alignSelf: isMe ? "flex-end" : "flex-start" }}
+                        onMouseEnter={() => setHoveredMsgId(msg.id)}
+                        onMouseLeave={() => setHoveredMsgId(null)}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexDirection: isMe ? "row-reverse" : "row" }}>
+                          <div style={{ background: isMe ? "var(--accent-blue)" : "var(--glass-bg)", border: isMe ? "none" : "1px solid var(--glass-border)", padding: "0.75rem 1rem", borderRadius: "var(--radius-md)", color: "#fff", position: "relative", minWidth: "100px" }}>
+                            
+                            {/* Reply Preview */}
+                            {parentMsg && (
+                              <div style={{ background: "rgba(0,0,0,0.2)", padding: "0.5rem", borderRadius: "var(--radius-sm)", marginBottom: "0.5rem", fontSize: "0.8rem", borderLeft: "3px solid var(--accent-purple)", cursor: "pointer", opacity: 0.8 }}>
+                                <div style={{ fontWeight: "bold", marginBottom: "0.2rem" }}>{parentMsg.sender_id === sessionUser.id ? "You" : "Them"}</div>
+                                <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "200px" }}>
+                                  <MessageContentRenderer msg={parentMsg} isMe={parentMsg.sender_id === sessionUser.id} />
+                                </div>
+                              </div>
+                            )}
+
+                            <MessageContentRenderer msg={msg} isMe={isMe} />
+
+                            {msg.is_edited && !msg.is_deleted && (
+                              <span style={{ fontSize: "0.7rem", opacity: 0.6, marginLeft: "0.5rem" }}>(edited)</span>
+                            )}
+                            
+                            {/* Reactions Inline */}
+                            {Object.keys(reactionsObj).length > 0 && (
+                              <div style={{ display: "flex", gap: "0.25rem", marginTop: "0.5rem", flexWrap: "wrap" }}>
+                                {Object.entries(reactionsObj).map(([emoji, users]) => (
+                                  <span key={emoji} onClick={() => handleReact(msg, emoji)} style={{ fontSize: "0.8rem", background: "rgba(0,0,0,0.3)", padding: "0.1rem 0.4rem", borderRadius: "10px", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.25rem", border: users.includes(sessionUser.id) ? "1px solid var(--accent-purple)" : "1px solid transparent" }}>
+                                    {emoji} <span style={{ fontSize: "0.7rem", opacity: 0.8 }}>{users.length}</span>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Hover Context Menu */}
+                          {hoveredMsgId === msg.id && !msg.is_deleted && (
+                            <div style={{ display: "flex", gap: "0.25rem", background: "var(--glass-bg)", padding: "0.25rem", borderRadius: "var(--radius-sm)", border: "1px solid var(--glass-border)" }}>
+                              <button onClick={() => handleReact(msg, "👍")} title="React 👍" style={{ background: "none", border: "none", color: "var(--text-secondary)", cursor: "pointer", padding: "0.25rem" }}>👍</button>
+                              <button onClick={() => handleReact(msg, "❤️")} title="React ❤️" style={{ background: "none", border: "none", color: "var(--text-secondary)", cursor: "pointer", padding: "0.25rem" }}>❤️</button>
+                              <button onClick={() => setReplyingTo(msg)} title="Reply" style={{ background: "none", border: "none", color: "var(--text-secondary)", cursor: "pointer", padding: "0.25rem" }}><Reply size={14} /></button>
+                              {isMe && (
+                                <>
+                                  <button onClick={() => { setEditingMsg(msg); setInputText(msg.encrypted_content.startsWith("ENC_GROUP:") ? atob(msg.encrypted_content.split(":")[1]) : "<Cannot decrypt inline>"); }} title="Edit" style={{ background: "none", border: "none", color: "var(--text-secondary)", cursor: "pointer", padding: "0.25rem" }}><Edit2 size={14} /></button>
+                                  <button onClick={() => handleDelete(msg.id)} title="Delete" style={{ background: "none", border: "none", color: "var(--accent-red)", cursor: "pointer", padding: "0.25rem" }}><Trash2 size={14} /></button>
+                                </>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -461,16 +790,52 @@ export default function ChatClient({
               </div>
 
               {/* Input Area */}
-              <div style={{ padding: "1.5rem", borderTop: "1px solid var(--glass-border)", background: "rgba(255,255,255,0.02)" }}>
-                <form onSubmit={handleSendMessage} style={{ display: "flex", gap: "1rem" }}>
+              <div style={{ padding: "1rem 1.5rem", borderTop: "1px solid var(--glass-border)", background: "rgba(255,255,255,0.02)", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                
+                {/* Reply/Edit Previews */}
+                {replyingTo && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(0,0,0,0.2)", padding: "0.5rem 1rem", borderRadius: "var(--radius-md)", borderLeft: "3px solid var(--accent-purple)", fontSize: "0.85rem" }}>
+                    <div>
+                      <div style={{ fontWeight: "bold", color: "var(--accent-purple)", marginBottom: "0.25rem" }}>Replying to {replyingTo.sender_id === sessionUser.id ? "Yourself" : "Message"}</div>
+                      <div style={{ color: "var(--text-secondary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "400px" }}><MessageContentRenderer msg={replyingTo} isMe={replyingTo.sender_id === sessionUser.id} /></div>
+                    </div>
+                    <button onClick={() => setReplyingTo(null)} style={{ background: "none", border: "none", color: "var(--text-secondary)", cursor: "pointer" }}><X size={16} /></button>
+                  </div>
+                )}
+                {editingMsg && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(0,0,0,0.2)", padding: "0.5rem 1rem", borderRadius: "var(--radius-md)", borderLeft: "3px solid var(--accent-blue)", fontSize: "0.85rem" }}>
+                    <div>
+                      <div style={{ fontWeight: "bold", color: "var(--accent-blue)", marginBottom: "0.25rem" }}>Editing Message</div>
+                    </div>
+                    <button onClick={() => { setEditingMsg(null); setInputText(""); }} style={{ background: "none", border: "none", color: "var(--text-secondary)", cursor: "pointer" }}><X size={16} /></button>
+                  </div>
+                )}
+                {attachment && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(0,0,0,0.2)", padding: "0.5rem 1rem", borderRadius: "var(--radius-md)", borderLeft: "3px solid var(--accent-green)", fontSize: "0.85rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <Paperclip size={14} color="var(--text-secondary)" />
+                      <span style={{ color: "var(--text-secondary)" }}>{attachment.name}</span>
+                    </div>
+                    <button onClick={() => setAttachment(null)} style={{ background: "none", border: "none", color: "var(--text-secondary)", cursor: "pointer" }}><X size={16} /></button>
+                  </div>
+                )}
+
+                <form onSubmit={handleSendMessage} style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
+                  <input type="file" ref={fileInputRef} onChange={handleFileUpload} style={{ display: "none" }} />
+                  <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploadingFile} style={{ background: "transparent", border: "none", color: "var(--text-secondary)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {uploadingFile ? <div style={{ width: "18px", height: "18px", border: "2px solid var(--text-secondary)", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 1s linear infinite" }} /> : <Paperclip size={20} />}
+                  </button>
+                  <button type="button" onClick={() => setIsBurnerMode(!isBurnerMode)} style={{ background: "transparent", border: "none", color: isBurnerMode ? "var(--accent-red)" : "var(--text-secondary)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "color 0.2s" }} title="Burner Mode (View Once)">
+                    <Flame size={20} />
+                  </button>
                   <input 
                     type="text" 
                     value={inputText}
                     onChange={e => setInputText(e.target.value)}
-                    placeholder="Type an encrypted message..."
+                    placeholder={editingMsg ? "Edit your message..." : "Type an encrypted message..."}
                     style={{ flex: 1, background: "var(--glass-bg)", border: "1px solid var(--glass-border)", padding: "1rem 1.5rem", borderRadius: "100px", color: "#fff", outline: "none", fontSize: "1rem" }}
                   />
-                  <button type="submit" disabled={loading} className="btn btn-primary" style={{ padding: "0 1.5rem", borderRadius: "100px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <button type="submit" disabled={loading || (!inputText.trim() && !attachment)} className="btn btn-primary" style={{ padding: "0 1.5rem", height: "100%", borderRadius: "100px", display: "flex", alignItems: "center", justifyContent: "center", opacity: (inputText.trim() || attachment) ? 1 : 0.5 }}>
                     <Send size={18} />
                   </button>
                 </form>

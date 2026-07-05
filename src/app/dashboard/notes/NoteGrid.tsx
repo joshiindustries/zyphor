@@ -7,6 +7,7 @@ import { motion, Variants } from "framer-motion";
 interface Note {
   id: string;
   encrypted_title: string;
+  decryptedTitle?: string;
   updated_at: Date;
 }
 
@@ -54,7 +55,7 @@ export function NoteGrid({ notes }: NoteGridProps) {
           <Link href={`/dashboard/notes/${note.id}`} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
             <div style={{ background: "var(--glass-bg)", border: "1px solid var(--glass-border)", borderRadius: "var(--radius-md)", padding: "1.5rem", display: "flex", flexDirection: "column", cursor: "pointer", height: "200px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1rem" }}>
-                <h3 style={{ fontWeight: "700", fontSize: "1.1rem", margin: 0, wordBreak: "break-all", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Encrypted Note</h3>
+                <h3 style={{ fontWeight: "700", fontSize: "1.1rem", margin: 0, wordBreak: "break-all", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{note.decryptedTitle || "Encrypted Note"}</h3>
                 <button style={{ background: "transparent", border: "none", color: "var(--text-secondary)", cursor: "pointer" }}><MoreVertical size={16}/></button>
               </div>
               <p style={{ color: "var(--text-secondary)", fontSize: "0.85rem", flex: 1, overflow: "hidden", textOverflow: "ellipsis", wordBreak: "break-all" }}>

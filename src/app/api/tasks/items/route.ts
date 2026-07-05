@@ -93,3 +93,38 @@ export async function PUT(request: NextRequest) {
     return noStoreJson({ error: "Internal server error" }, { status: 500 });
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const user = await getUser();
+    if (!user) {
+      return noStoreJson({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const task_id = searchParams.get("taskId");
+    
+    if (!task_id) {
+      return noStoreJson({ error: "Missing taskId" }, { status: 400 });
+    }
+
+    // Verify task belongs to user
+    const existing = await prisma.task.findUnique({
+      where: { id: task_id },
+      include: { column: { include: { board: true } } }
+    });
+
+    if (!existing || existing.column.board.user_id !== user.id) {
+      return noStoreJson({ error: "Not found" }, { status: 404 });
+    }
+
+    await prisma.task.delete({
+      where: { id: task_id }
+    });
+
+    return noStoreJson({ success: true });
+  } catch (error) {
+    console.error("Error deleting task:", error);
+    return noStoreJson({ error: "Internal server error" }, { status: 500 });
+  }
+}
