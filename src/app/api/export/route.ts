@@ -36,7 +36,7 @@ export async function GET() {
         export_date: new Date().toISOString(),
         user: {
           email: userRecord?.email,
-          vault_salt: userRecord?.vault_salt
+          username: userRecord?.username
         }
       },
       data: {
