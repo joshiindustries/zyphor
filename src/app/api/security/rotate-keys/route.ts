@@ -18,19 +18,17 @@ export async function GET(request: NextRequest) {
       columns,
       tasks,
       events,
-      passwords,
-      userData
+      passwords
     ] = await Promise.all([
       prisma.vaultFolder.findMany({ where: { user_id: user.id } }),
       prisma.vaultFile.findMany({ where: { user_id: user.id } }),
       prisma.vaultTag.findMany({ where: { user_id: user.id } }),
-      prisma.secureNote.findMany({ where: { user_id: user.id } }),
-      prisma.kanbanBoard.findMany({ where: { user_id: user.id } }),
-      prisma.kanbanColumn.findMany({ where: { board: { user_id: user.id } } }),
-      prisma.kanbanTask.findMany({ where: { column: { board: { user_id: user.id } } } }),
-      prisma.calendarEvent.findMany({ where: { user_id: user.id } }),
-      prisma.passwordEntry.findMany({ where: { user_id: user.id } }),
-      prisma.user.findUnique({ where: { id: user.id }, select: { encrypted_priv_key: true } })
+      prisma.note.findMany({ where: { user_id: user.id } }),
+      prisma.taskBoard.findMany({ where: { user_id: user.id } }),
+      prisma.taskColumn.findMany({ where: { board: { user_id: user.id } } }),
+      prisma.task.findMany({ where: { column: { board: { user_id: user.id } } } }),
+      prisma.event.findMany({ where: { calendar: { user_id: user.id } } }),
+      prisma.passwordEntry.findMany({ where: { user_id: user.id } })
     ]);
 
     return noStoreJson({
@@ -44,8 +42,7 @@ export async function GET(request: NextRequest) {
         columns,
         tasks,
         events,
-        passwords,
-        encrypted_priv_key: userData?.encrypted_priv_key
+        passwords
       }
     });
   } catch (error) {
@@ -71,63 +68,73 @@ export async function POST(request: NextRequest) {
       columns,
       tasks,
       events,
-      passwords,
-      encrypted_priv_key
+      passwords
     } = payload;
 
     // Use Prisma Transactions for atomicity
     await prisma.$transaction(async (tx) => {
-      // Update User Key
-      if (encrypted_priv_key) {
-        await tx.user.update({
-          where: { id: user.id },
-          data: { encrypted_priv_key }
-        });
-      }
 
       // Vault Folders
       for (const f of folders || []) {
-        await tx.vaultFolder.update({ where: { id: f.id }, data: { encrypted_metadata: f.encrypted_metadata } });
+        if (f.encrypted_name) {
+          await tx.vaultFolder.update({ where: { id: f.id }, data: { encrypted_name: f.encrypted_name } });
+        }
       }
 
       // Vault Files
       for (const f of files || []) {
-        await tx.vaultFile.update({ where: { id: f.id }, data: { encrypted_metadata: f.encrypted_metadata } });
+        if (f.encrypted_metadata) {
+          await tx.vaultFile.update({ where: { id: f.id }, data: { encrypted_metadata: f.encrypted_metadata } });
+        }
       }
 
       // Vault Tags
       for (const t of tags || []) {
-        await tx.vaultTag.update({ where: { id: t.id }, data: { encrypted_name: t.encrypted_name, encrypted_color: t.encrypted_color } });
+        if (t.encrypted_name) {
+          await tx.vaultTag.update({ where: { id: t.id }, data: { encrypted_name: t.encrypted_name } });
+        }
       }
 
       // Secure Notes
       for (const n of notes || []) {
-        await tx.secureNote.update({ where: { id: n.id }, data: { encrypted_content: n.encrypted_content } });
+        if (n.encrypted_content) {
+          await tx.note.update({ where: { id: n.id }, data: { encrypted_content: n.encrypted_content } });
+        }
       }
 
       // Kanban Boards
       for (const b of boards || []) {
-        await tx.kanbanBoard.update({ where: { id: b.id }, data: { encrypted_metadata: b.encrypted_metadata } });
+        if (b.encrypted_title) {
+          await tx.taskBoard.update({ where: { id: b.id }, data: { encrypted_title: b.encrypted_title } });
+        }
       }
 
       // Kanban Columns
       for (const c of columns || []) {
-        await tx.kanbanColumn.update({ where: { id: c.id }, data: { encrypted_name: c.encrypted_name } });
+        if (c.name) {
+          await tx.taskColumn.update({ where: { id: c.id }, data: { name: c.name } });
+        }
       }
 
       // Kanban Tasks
       for (const t of tasks || []) {
-        await tx.kanbanTask.update({ where: { id: t.id }, data: { encrypted_title: t.encrypted_title, encrypted_description: t.encrypted_description } });
+        if (t.encrypted_title) {
+          await tx.task.update({ where: { id: t.id }, data: { encrypted_title: t.encrypted_title, encrypted_description: t.encrypted_description } });
+        }
       }
 
       // Calendar Events
       for (const e of events || []) {
-        await tx.calendarEvent.update({ where: { id: e.id }, data: { encrypted_title: e.encrypted_title, encrypted_description: e.encrypted_description } });
+        if (e.encrypted_title) {
+          await tx.event.update({ where: { id: e.id }, data: { encrypted_title: e.encrypted_title, encrypted_description: e.encrypted_description } });
+        }
       }
 
       // Password Entries
       for (const p of passwords || []) {
-        await tx.passwordEntry.update({ where: { id: p.id }, data: { encrypted_username: p.encrypted_username, encrypted_password: p.encrypted_password, encrypted_notes: p.encrypted_notes, encrypted_url: p.encrypted_url } });
+        if (p.encrypted_data) {
+          await tx.passwordEntry.update({ where: { id: p.id }, data: { encrypted_data: p.encrypted_data } });
+        }
       }
     }, {
       maxWait: 15000, // 15 seconds max wait to start transaction
