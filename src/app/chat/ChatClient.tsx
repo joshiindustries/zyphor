@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { ArrowLeft, MessageSquare, Plus, Lock, Send, Users, Video, Edit2, Trash2, Reply, Smile, X, Paperclip, Flame } from "lucide-react";
 import { encryptMessage, decryptMessage } from "@/lib/key-exchange";
