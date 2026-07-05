@@ -30,9 +30,9 @@ export function VaultClient({ initialFiles }: { initialFiles: any[] }) {
     }
   }, []);
 
-  const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
+  const arrayBufferToBase64 = (buffer: ArrayBuffer | Uint8Array) => {
     let binary = '';
-    const bytes = new Uint8Array(buffer);
+    const bytes = new Uint8Array(buffer as ArrayBuffer);
     for (let i = 0; i < bytes.byteLength; i++) {
       binary += String.fromCharCode(bytes[i]);
     }
