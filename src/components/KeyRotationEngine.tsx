@@ -37,11 +37,8 @@ export default function KeyRotationEngine() {
       const username = localStorage.getItem("zyphor_username") || "user"; // Fallback to a string if needed
       const usernameBytes = new TextEncoder().encode(username);
       
-      const oldKeyObj = await deriveKey(currentPassword, usernameBytes);
-      const newKeyObj = await deriveKey(newPassword, usernameBytes);
-
-      const oldVaultKey = oldKeyObj.key;
-      const newVaultKey = newKeyObj.key;
+      const oldVaultKey = await deriveKey(currentPassword, usernameBytes);
+      const newVaultKey = await deriveKey(newPassword, usernameBytes);
 
       // 2. Fetch all data
       setProgress(20);
