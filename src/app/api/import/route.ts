@@ -30,24 +30,33 @@ export async function POST(request: NextRequest) {
 
     // Tasks
     if (tasks && Array.isArray(tasks)) {
-      // Create a default board for imported tasks
-      let board = await prisma.board.findFirst({ where: { user_id: user.id, title: "Imported Board" } });
+      // Find any board
+      let board = await prisma.taskBoard.findFirst({ where: { user_id: user.id } });
       if (!board) {
-        board = await prisma.board.create({
+        board = await prisma.taskBoard.create({
           data: {
             user_id: user.id,
-            title: "Imported Board",
-            columns: JSON.stringify([{ id: "col-imported", title: "Imported Tasks", taskIds: [] }])
+            encrypted_title: "Imported Board"
           }
         });
       }
 
-      const formattedTasks = tasks.map(t => ({
-        user_id: user.id,
-        board_id: board!.id,
+      let column = await prisma.taskColumn.findFirst({ where: { board_id: board.id } });
+      if (!column) {
+        column = await prisma.taskColumn.create({
+          data: {
+            board_id: board.id,
+            name: "Imported",
+            order: 0
+          }
+        });
+      }
+
+      const formattedTasks = tasks.map((t, index) => ({
+        column_id: column.id,
         encrypted_title: t.encrypted_title,
         encrypted_description: t.encrypted_description,
-        encrypted_column_id: t.encrypted_column_id || "col-imported" // Default fallback
+        order: index
       }));
       
       if (formattedTasks.length > 0) {
@@ -63,7 +72,7 @@ export async function POST(request: NextRequest) {
         encrypted_data: p.encrypted_data
       }));
       if (formattedPasswords.length > 0) {
-        await prisma.password.createMany({ data: formattedPasswords });
+        await prisma.passwordEntry.createMany({ data: formattedPasswords });
         imported.passwords = formattedPasswords.length;
       }
     }
