@@ -35,9 +35,10 @@ export default function KeyRotationEngine() {
       // Wait, the standard deriveKey uses a hardcoded salt in our simplified demo architecture, or the username.
       // We will assume deriveKey works identically to login.
       const username = localStorage.getItem("zyphor_username") || "user"; // Fallback to a string if needed
+      const usernameBytes = new TextEncoder().encode(username);
       
-      const oldKeyObj = await deriveKey(currentPassword, username);
-      const newKeyObj = await deriveKey(newPassword, username);
+      const oldKeyObj = await deriveKey(currentPassword, usernameBytes);
+      const newKeyObj = await deriveKey(newPassword, usernameBytes);
 
       const oldVaultKey = oldKeyObj.key;
       const newVaultKey = newKeyObj.key;
