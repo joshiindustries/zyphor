@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react";
 import { Lock, Send, Shield, AlertTriangle, CheckCircle, Flame } from "lucide-react";
 import Link from "next/link";
 import { encryptMessage } from "@/lib/key-exchange";
 
-export default function ZyphorDropPage({ params }: { params: { username: string } }) {
+export default function ZyphorDropPage(props: { params: Promise<{ username: string }> }) {
+  const params = use(props.params);
   const [publicKey, setPublicKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

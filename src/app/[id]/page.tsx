@@ -8,7 +8,9 @@ import { useParams, useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { withCsrfHeaders } from "@/lib/csrf-client";
 
-export default function DownloadPage() {
+import { Suspense } from "react";
+
+function DownloadPageContent() {
   const [password, setPassword] = useState("");
   const [files, setFiles] = useState<any[]>([]);
   const [error, setError] = useState("");
@@ -235,5 +237,13 @@ export default function DownloadPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function DownloadPage() {
+  return (
+    <Suspense fallback={<div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh" }}>Loading, please wait...</div>}>
+      <DownloadPageContent />
+    </Suspense>
   );
 }
