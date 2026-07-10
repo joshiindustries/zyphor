@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 import { getUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { noStoreJson } from "@/lib/security";
+export const dynamic = "force-dynamic";
+
 
 export async function POST(request: NextRequest) {
   try {

@@ -6,6 +6,8 @@ import { getClientIp, isValidLinkId, isValidUuid, noStoreJson } from '@/lib/secu
 import { databaseUnavailableMessage, isPrismaDatabaseConnectivityError } from '@/lib/prisma-errors';
 import { downloadSupabaseObject, isSupabaseStorageError } from '@/lib/supabase-storage';
 
+export const dynamic = "force-dynamic";
+
 type DownloadFileRow = {
   id: string;
   original_name: string;

@@ -3,6 +3,8 @@ import { getUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { noStoreJson } from "@/lib/security";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
   try {
     const user = await getUser();

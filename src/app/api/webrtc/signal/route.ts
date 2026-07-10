@@ -3,6 +3,8 @@ import { prisma } from "@/lib/db";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getClientIp, isSameOrigin, isValidChannelId, isValidSignalName, noStoreJson } from "@/lib/security";
 
+export const dynamic = "force-dynamic";
+
 type SignalRow = {
   id: string;
   channel_id: string;

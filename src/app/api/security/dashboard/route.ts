@@ -4,6 +4,8 @@ import { prisma } from "@/lib/db";
 import { noStoreJson } from "@/lib/security";
 import { calculateSecurityScore } from "@/lib/security-score";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   try {
     const user = await getUser();
