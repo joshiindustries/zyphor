@@ -38,8 +38,8 @@ export default function NetworkGuard({ children }: { children: React.ReactNode }
     }
     
     try {
-      // Ping zyporr.vercel.app to check true internet connectivity
-      const res = await fetch("https://zyporr.vercel.app", { method: "HEAD", cache: "no-store" });
+      // Ping zyphorr.vercel.app to check true internet connectivity
+      const res = await fetch("https://zyphorr.vercel.app/", { method: "HEAD", cache: "no-store" });
       if (res.ok || res.status >= 200 || res.type === 'opaque') { // opaque for no-cors
         setIsOffline(false);
       } else {
