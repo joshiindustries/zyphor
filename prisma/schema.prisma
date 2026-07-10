@@ -47,6 +47,7 @@ model User {
   calendars             EventCalendar[]
   login_history         LoginHistory[]
   trusted_devices       TrustedDevice[]
+  device_otps           DeviceOtp[]
   security_alerts       SecurityAlert[]
   password_entries      PasswordEntry[]
   received_drops        DropMessage[] @relation("ReceivedDrops")
