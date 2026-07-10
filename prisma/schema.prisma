@@ -21,6 +21,8 @@ model User {
   online_status       String?     @default("online")
   show_last_seen      Boolean     @default(true)
   read_receipts       Boolean     @default(true)
+  vault_salt          String?     @db.Text
+  vault_validation    String?     @db.Text
   created_at          DateTime    @default(now())
 
   links          Link[]
@@ -485,18 +487,36 @@ model LoginHistory {
 }
 
 model TrustedDevice {
+  id                String    @id @default(uuid())
+  user_id           String
+  device_id         String    @unique
+  device_token_hash String    @db.Text
+  fingerprint_hash  String    @db.Text
+  ip_address        String?
+  name              String?
+  os                String?
+  browser           String?
+  trusted           Boolean   @default(false)
+  expires_at        DateTime?
+  last_active       DateTime  @default(now())
+  created_at        DateTime  @default(now())
+
+  user              User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("trusted_devices")
+}
+
+model DeviceOtp {
   id         String   @id @default(uuid())
   user_id    String
-  device_id  String   @unique
-  name       String?
-  os         String?
-  browser    String?
-  last_active DateTime @default(now())
+  email      String
+  otp        String
+  expires_at DateTime
   created_at DateTime @default(now())
 
   user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
-  @@map("trusted_devices")
+  @@map("device_otps")
 }
 
 model SecurityAlert {

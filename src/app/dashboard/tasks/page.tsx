@@ -16,6 +16,7 @@ export default function BoardsList() {
   const [boards, setBoards] = useState<any[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [newBoardName, setNewBoardName] = useState("");
+  const [needsSetup, setNeedsSetup] = useState(false);
 
   useEffect(() => {
     const pwd = sessionStorage.getItem("zyphor_vault_pwd");
@@ -34,7 +35,11 @@ export default function BoardsList() {
     try {
       const saltRes = await fetch("/api/vault/salt");
       const saltData = await saltRes.json();
-      if (!saltData.success) throw new Error("Vault not initialized.");
+      if (!saltData.success) {
+        setNeedsSetup(true);
+        setLoading(false);
+        return;
+      }
 
       const key = await deriveKey(masterPassword, saltData.salt);
       
@@ -99,20 +104,67 @@ export default function BoardsList() {
     }
   };
 
+  const handleInitVault = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (masterPassword.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+    setLoading(true);
+    setError("");
+
+    try {
+      // Import arrayBufferToBase64 if needed, or implement it here
+      const saltBuffer = new Uint8Array(16);
+      window.crypto.getRandomValues(saltBuffer);
+      let binary = '';
+      for (let i = 0; i < saltBuffer.byteLength; i++) {
+        binary += String.fromCharCode(saltBuffer[i]);
+      }
+      const saltBase64 = window.btoa(binary);
+
+      const key = await deriveKey(masterPassword, saltBuffer);
+      const validation = await encryptTextWithAES(key, "ZYPHOR_VAULT_OK");
+
+      const res = await fetch("/api/vault/init", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ salt: saltBase64, validation })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setNeedsSetup(false);
+        setMasterKey(key);
+        sessionStorage.setItem("zyphor_vault_pwd", masterPassword);
+        await loadBoards(key);
+      } else {
+        throw new Error(data.error || "Failed to initialize vault.");
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (!masterKey) {
     return (
       <div style={{ padding: "4rem 2rem", maxWidth: "500px", margin: "0 auto", textAlign: "center" }}>
         <div style={{ background: "rgba(255,255,255,0.03)", padding: "2rem", borderRadius: "var(--radius-lg)", border: "1px solid var(--glass-border)" }}>
           <Lock size={48} color="var(--accent-blue)" style={{ margin: "0 auto 1.5rem" }} />
-          <h1 style={{ fontSize: "1.5rem", fontWeight: "600", marginBottom: "0.5rem" }}>Unlock Tasks</h1>
+          <h1 style={{ fontSize: "1.5rem", fontWeight: "600", marginBottom: "0.5rem" }}>
+            {needsSetup ? "Initialize Master Vault" : "Unlock Tasks"}
+          </h1>
           <p style={{ color: "var(--text-secondary)", marginBottom: "2rem", fontSize: "0.95rem" }}>
-            Your Kanban boards are End-to-End Encrypted. Enter your Master Vault Password to unlock them.
+            {needsSetup 
+              ? "Your vault has not been initialized. Please create a strong Master Password to encrypt your data." 
+              : "Your Kanban boards are End-to-End Encrypted. Enter your Master Vault Password to unlock them."}
           </p>
 
-          <form onSubmit={handleUnlock} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          <form onSubmit={needsSetup ? handleInitVault : handleUnlock} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
             <input 
               type="password" 
-              placeholder="Master Password" 
+              placeholder={needsSetup ? "Create Master Password" : "Master Password"} 
               value={masterPassword} 
               onChange={e => setMasterPassword(e.target.value)}
               className="input-field" 
@@ -120,7 +172,7 @@ export default function BoardsList() {
             />
             {error && <div style={{ color: "var(--accent-red)", fontSize: "0.9rem" }}>{error}</div>}
             <button type="submit" className="btn btn-primary" disabled={loading} style={{ padding: "0.75rem" }}>
-              {loading ? "Decrypting..." : "Unlock Boards"}
+              {loading ? (needsSetup ? "Initializing..." : "Decrypting...") : (needsSetup ? "Initialize Vault" : "Unlock Boards")}
             </button>
           </form>
         </div>

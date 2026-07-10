@@ -8,6 +8,8 @@ import { checkRateLimit, clearRateLimit } from "@/lib/rate-limit";
 import { getAvatarFromSupabaseUser, getNameFromSupabaseUser, isSupabaseAuthConfigured, supabaseSignInWithPassword } from "@/lib/supabase-auth";
 import { isValidEmail, normalizeEmail } from "@/lib/security";
 import { databaseUnavailableMessage, isPrismaDatabaseConnectivityError, isPrismaSchemaMissingError, schemaMissingMessage } from "@/lib/prisma-errors";
+import { cookies } from "next/headers";
+import { sendOtpEmail } from "@/lib/email";
 
 function sanitizeDisplayName(input: unknown): string | null {
   if (typeof input !== "string") return null;
@@ -85,12 +87,14 @@ export const authOptions: AuthOptions = {
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
-        turnstileToken: { label: "Turnstile Token", type: "text" }
+        turnstileToken: { label: "Turnstile Token", type: "text" },
+        fingerprintHash: { label: "Fingerprint Hash", type: "text" }
       },
       async authorize(credentials) {
         const rawEmail = credentials?.email || "";
         const password = credentials?.password || "";
         const turnstileToken = credentials?.turnstileToken;
+        const fingerprintHash = credentials?.fingerprintHash || "unknown";
         const email = normalizeEmail(rawEmail);
 
         if (!email || !password || !isValidEmail(email)) return null;
@@ -142,8 +146,8 @@ export const authOptions: AuthOptions = {
                 });
               }
 
-              await clearRateLimit(email, "login_attempt");
-              return { id: dbUser.id, email: dbUser.email, name: dbUser.name, image: dbUser.avatar };
+              const returnUser = { id: dbUser.id, email: dbUser.email, name: dbUser.name, image: dbUser.avatar };
+              return await verifyDeviceAndReturn(returnUser, fingerprintHash);
             }
 
             if (authResult.status >= 500) {
@@ -161,16 +165,14 @@ export const authOptions: AuthOptions = {
           const [salt, hash] = legacyUser.password_hash.split(":");
           const verifyHash = crypto.scryptSync(password, salt, 64).toString("hex");
 
-          if (hash !== verifyHash) return null;
-
-          await clearRateLimit(email, "login_attempt");
-          return {
+          const returnUser = {
             id: legacyUser.id,
             email: legacyUser.email,
             name: legacyUser.name,
             image: legacyUser.avatar,
           };
-        } catch (error) {
+          return await verifyDeviceAndReturn(returnUser, fingerprintHash);
+        } catch (error: any) {
           if (isPrismaDatabaseConnectivityError(error)) {
             throw new Error(databaseUnavailableMessage("Authentication"));
           }
@@ -338,4 +340,59 @@ export async function getUser() {
     console.error('Auth error:', error);
     return null;
   }
+}
+
+async function verifyDeviceAndReturn(user: any, fingerprintHash: string) {
+  const cookieStore = await cookies();
+  const deviceToken = cookieStore.get("zyphor_device_token")?.value;
+
+  let isTrusted = false;
+
+  if (deviceToken) {
+    const tokenHash = crypto.createHash("sha256").update(deviceToken).digest("hex");
+    const trustedDevice = await prisma.trustedDevice.findUnique({
+      where: { device_id: tokenHash }
+    });
+
+    if (trustedDevice && trustedDevice.user_id === user.id && trustedDevice.trusted) {
+      if (!trustedDevice.expires_at || trustedDevice.expires_at > new Date()) {
+        isTrusted = true;
+        // Update last active
+        await prisma.trustedDevice.update({
+          where: { id: trustedDevice.id },
+          data: { last_active: new Date(), fingerprint_hash: fingerprintHash }
+        });
+      }
+    }
+  }
+
+  if (!isTrusted) {
+    // Generate OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // Clear old OTPs
+    await prisma.deviceOtp.deleteMany({ where: { user_id: user.id } });
+
+    await prisma.deviceOtp.create({
+      data: {
+        user_id: user.id,
+        email: user.email,
+        otp: otp,
+        expires_at: new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
+      }
+    });
+
+    console.log(`\n\n========================================`);
+    console.log(`🔒 NEW DEVICE LOGIN DETECTED`);
+    console.log(`📧 To: ${user.email}`);
+    console.log(`🔑 OTP: ${otp}`);
+    console.log(`========================================\n\n`);
+
+    // Send the actual email
+    await sendOtpEmail(user.email, otp);
+
+    throw new Error("device_verification_required");
+  }
+
+  return user;
 }
