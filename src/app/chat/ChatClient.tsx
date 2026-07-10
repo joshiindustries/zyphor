@@ -407,47 +407,44 @@ export default function ChatClient({
 
     setUploadingFile(true);
     try {
-      const aesKey = await window.crypto.subtle.generateKey(
-        { name: "AES-GCM", length: 256 },
-        true,
-        ["encrypt", "decrypt"]
-      );
-      const iv = window.crypto.getRandomValues(new Uint8Array(12));
+      // 1. Generate a random encryption key for the file
+      const encryptionKey = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10);
       
-      const arrayBuffer = await file.arrayBuffer();
+      // 2. Encrypt file using the same logic as the main upload area
+      const { encryptFile } = await import("@/lib/crypto");
+      const { encryptedData, salt, iv } = await encryptFile(file, encryptionKey);
       
-      const encryptedContent = await window.crypto.subtle.encrypt(
-        { name: "AES-GCM", iv },
-        aesKey,
-        arrayBuffer
-      );
-      
-      const blob = new Blob([encryptedContent], { type: "application/octet-stream" });
       const formData = new FormData();
-      formData.append("file", blob, file.name); 
+      formData.append("maxDownloads", "0");
+      formData.append("isProtected", "true");
+      formData.append("allowSave", "true");
+      formData.append("authRequired", "false");
+      formData.append("files", encryptedData, `${file.name}.enc`);
+      formData.append("salt", window.btoa(String.fromCharCode(...Array.from(salt))));
+      formData.append("iv", window.btoa(String.fromCharCode(...Array.from(iv))));
+      formData.append("originalName", file.name);
+      formData.append("originalMime", file.type || "application/octet-stream");
       
-      const res = await fetch("/api/chat/attachments", {
+      const { withCsrfHeaders } = await import("@/lib/csrf-client");
+
+      // 3. Upload to main /api/upload endpoint
+      const res = await fetch("/api/upload", {
         method: "POST",
+        headers: withCsrfHeaders(),
         body: formData
       });
       const data = await res.json();
       
-      if (data.url) {
-        const rawAesKey = await window.crypto.subtle.exportKey("raw", aesKey);
-        const aesKeyB64 = window.btoa(String.fromCharCode(...new Uint8Array(rawAesKey)));
-        const ivB64 = window.btoa(String.fromCharCode(...new Uint8Array(iv)));
-        
-        setAttachment({
-          url: data.url,
-          name: file.name,
-          type: file.type,
-          size: file.size,
-          aesKey: aesKeyB64,
-          iv: ivB64
-        });
+      if (data.success) {
+        // 4. Set the input text to the secure share link so the user can send it
+        const linkDetail = `${window.location.origin}/${data.linkId}#${encryptionKey}`;
+        setInputText(prev => (prev ? prev + "\n" + linkDetail : linkDetail));
+      } else {
+        throw new Error(data.error || "Failed to upload file");
       }
     } catch (err) {
       console.error("Upload failed", err);
+      alert("File upload failed: " + err);
     } finally {
       setUploadingFile(false);
       if (fileInputRef.current) fileInputRef.current.value = "";

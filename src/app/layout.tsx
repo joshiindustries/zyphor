@@ -22,6 +22,8 @@ import { Providers } from "./providers";
 import CookieConsentGate from "@/components/CookieConsentGate";
 import CommandPalette from "@/components/CommandPalette";
 import VaultSecurityManager from "@/components/VaultSecurityManager";
+import NetworkGuard from "@/components/NetworkGuard";
+import AppEnforcer from "@/components/AppEnforcer";
 
 export default function RootLayout({
   children,
@@ -31,12 +33,16 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <Providers>
-          {children}
-          <CookieConsentGate />
-          <CommandPalette />
-          <VaultSecurityManager />
-        </Providers>
+        <NetworkGuard>
+          <AppEnforcer>
+            <Providers>
+              {children}
+              <CookieConsentGate />
+              <CommandPalette />
+              <VaultSecurityManager />
+            </Providers>
+          </AppEnforcer>
+        </NetworkGuard>
       </body>
     </html>
   );

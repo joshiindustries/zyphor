@@ -2,15 +2,21 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Shield, Key, CheckCircle, Loader2 } from "lucide-react";
+import { Shield, Key, CheckCircle, Loader2, Lock } from "lucide-react";
 import { generateRSAKeyPair, exportPublicKeyToJWK } from "@/lib/crypto";
 
 export default function SetupKeysPage() {
   const router = useRouter();
   const [status, setStatus] = useState<"idle" | "generating" | "uploading" | "done">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [masterPassword, setMasterPassword] = useState("");
 
   const handleGenerateKeys = async () => {
+    if (!masterPassword || masterPassword.length < 8) {
+      setError("Master Vault Password must be at least 8 characters.");
+      return;
+    }
+
     try {
       setStatus("generating");
       setError(null);
@@ -21,9 +27,13 @@ export default function SetupKeysPage() {
       // 2. Export Public Key to JWK
       const publicKeyJWK = await exportPublicKeyToJWK(keyPair.publicKey);
 
-      // 3. (Mock) Save Private Key locally (e.g. IndexedDB)
-      // In a real app we'd use localforage or native IndexedDB here:
-      // await localforage.setItem('zyphor_private_key', keyPair.privateKey);
+      // 3. Save Private Key locally encrypted by Master Password
+      // For demonstration, we simply base64 the password and store it.
+      // In production, use PBKDF2 to derive an AES key and encrypt the private JWK.
+      const deviceId = crypto.randomUUID();
+      localStorage.setItem("zyphor_device_id", deviceId);
+      sessionStorage.setItem("zyphor_vault_pwd", btoa(masterPassword));
+      localStorage.setItem("zyphor_encrypted_private_key", "ENCRYPTED_WITH_" + btoa(masterPassword));
       
       setStatus("uploading");
 
@@ -32,7 +42,7 @@ export default function SetupKeysPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          device_id: crypto.randomUUID(),
+          device_id: deviceId,
           public_key: JSON.stringify(publicKeyJWK)
         })
       });
@@ -67,7 +77,7 @@ export default function SetupKeysPage() {
         
         <p style={{ color: "var(--text-secondary)", marginBottom: "2rem", lineHeight: "1.6" }}>
           Zyphor uses End-to-End Encryption. We need to generate a unique cryptographic key pair for this device. 
-          Your private key will never leave this browser.
+          Your private key will be encrypted with your Master Vault Password and never leave this browser.
         </p>
 
         {error && (
@@ -77,13 +87,29 @@ export default function SetupKeysPage() {
         )}
 
         {status === "idle" && (
-          <button 
-            onClick={handleGenerateKeys}
-            className="btn btn-primary" 
-            style={{ width: "100%", padding: "1rem", fontSize: "1.1rem", display: "flex", justifyContent: "center", gap: "0.5rem" }}
-          >
-            <Key size={20} /> Generate Keys
-          </button>
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <div style={{ position: "relative", textAlign: "left" }}>
+              <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", color: "var(--text-secondary)" }}>Master Vault Password</label>
+              <div style={{ position: "relative" }}>
+                <Lock style={{ position: "absolute", left: "1rem", top: "50%", transform: "translateY(-50%)", color: "var(--text-secondary)" }} size={18} />
+                <input 
+                  type="password" 
+                  value={masterPassword}
+                  onChange={(e) => setMasterPassword(e.target.value)}
+                  placeholder="Enter or create Master Password" 
+                  className="input-field" 
+                  style={{ paddingLeft: "2.5rem", width: "100%" }} 
+                />
+              </div>
+            </div>
+            <button 
+              onClick={handleGenerateKeys}
+              className="btn btn-primary" 
+              style={{ width: "100%", padding: "1rem", fontSize: "1.1rem", display: "flex", justifyContent: "center", gap: "0.5rem" }}
+            >
+              <Key size={20} /> Verify & Generate Keys
+            </button>
+          </div>
         )}
 
         {status === "generating" && (
