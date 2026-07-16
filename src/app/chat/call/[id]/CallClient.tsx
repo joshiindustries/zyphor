@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Mic, MicOff, Video, VideoOff, PhoneOff } from "lucide-react";
 import { ZyphorWebRTC } from "@/lib/webrtc";
+import { withCsrfHeaders } from "@/lib/csrf-client";
 
 export default function CallClient({ 
   callId, 
@@ -30,7 +31,7 @@ export default function CallClient({
       // Send signal to API
       await fetch("/api/calls/signals", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: withCsrfHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
           call_id: callId,
           type,
@@ -135,7 +136,7 @@ export default function CallClient({
     // Mark call as ended in DB
     await fetch("/api/calls", {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: withCsrfHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ call_id: callId, status: "ENDED" })
     });
     

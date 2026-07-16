@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { ArrowLeft, MessageSquare, Plus, Lock, Send, Users, Video, Edit2, Trash2, Reply, Smile, X, Paperclip, Flame } from "lucide-react";
 import { encryptMessage, decryptMessage } from "@/lib/key-exchange";
+import { withCsrfHeaders } from "@/lib/csrf-client";
 
 function AttachmentRenderer({ attachment }: { attachment: any }) {
   const [decryptedUrl, setDecryptedUrl] = useState<string | null>(null);
@@ -95,7 +96,7 @@ function MessageContentRenderer({ msg, isMe }: { msg: any, isMe: boolean }) {
 
     if (parsed && parsed.viewOnce && !isMe) {
       // Fire delete to server immediately
-      fetch(`/api/chat/messages?id=${msg.id}`, { method: 'DELETE' }).catch(console.error);
+      fetch(`/api/chat/messages?id=${msg.id}`, { method: 'DELETE', headers: withCsrfHeaders() }).catch(console.error);
       
       setTimeLeft(15);
       const timer = setInterval(() => {
@@ -301,7 +302,7 @@ export default function ChatClient({
         const url = activeType === "dm" ? `/api/chat/messages/${editingMsg.id}` : `/api/groups/messages/${editingMsg.id}`;
         const res = await fetch(url, {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          headers: withCsrfHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify({ encrypted_content: encryptedPayload })
         });
         const data = await res.json();
@@ -321,7 +322,7 @@ export default function ChatClient({
 
         const res = await fetch(url, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: withCsrfHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify(body)
         });
 
@@ -345,7 +346,7 @@ export default function ChatClient({
       const url = activeType === "dm" ? `/api/chat/messages/${msgId}` : `/api/groups/messages/${msgId}`;
       const res = await fetch(url, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: withCsrfHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ is_deleted: true })
       });
       const data = await res.json();
@@ -388,7 +389,7 @@ export default function ChatClient({
       const url = activeType === "dm" ? `/api/chat/messages/${msg.id}` : `/api/groups/messages/${msg.id}`;
       const res = await fetch(url, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: withCsrfHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ reactions: encryptedReactions })
       });
       
@@ -464,7 +465,7 @@ export default function ChatClient({
       
       const res = await fetch("/api/groups", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: withCsrfHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
           name: newGroupName,
           members
@@ -519,7 +520,7 @@ export default function ChatClient({
             <button className="btn btn-secondary" style={{ background: "rgba(0,0,0,0.2)", border: "none", color: "#fff" }} onClick={async () => {
               await fetch("/api/calls", {
                 method: "PATCH",
-                headers: { "Content-Type": "application/json" },
+                headers: withCsrfHeaders({ "Content-Type": "application/json" }),
                 body: JSON.stringify({ call_id: activeCall.id, status: "ENDED" })
               });
               setActiveCall(null);
@@ -619,7 +620,7 @@ export default function ChatClient({
                       onClick={async () => {
                         const res = await fetch("/api/chat", {
                           method: "POST",
-                          headers: { "Content-Type": "application/json" },
+                          headers: withCsrfHeaders({ "Content-Type": "application/json" }),
                           body: JSON.stringify({ target_user_id: u.id })
                         });
                         if (res.ok) window.location.reload();
@@ -691,7 +692,7 @@ export default function ChatClient({
                       try {
                         const res = await fetch("/api/calls", {
                           method: "POST",
-                          headers: { "Content-Type": "application/json" },
+                          headers: withCsrfHeaders({ "Content-Type": "application/json" }),
                           body: JSON.stringify({ conversation_id: activeId })
                         });
                         const data = await res.json();
