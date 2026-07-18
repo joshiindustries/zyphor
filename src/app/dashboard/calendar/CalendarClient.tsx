@@ -2,14 +2,15 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Shield, Lock, Trash2, X } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Shield, Lock, Trash2, X, Edit2, Check } from "lucide-react";
 import { deriveKey, encryptTextWithAES, decryptTextWithAES } from "@/lib/crypto";
+import { withCsrfHeaders } from "@/lib/csrf-client";
 
 export function CalendarClient({ sessionUser }: { sessionUser: any }) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [events, setEvents] = useState<any[]>([]);
   const [calendars, setCalendars] = useState<any[]>([]);
-  
+
   // Vault State
   const [masterPassword, setMasterPassword] = useState("");
   const [masterKey, setMasterKey] = useState<CryptoKey | null>(null);
@@ -20,8 +21,11 @@ export function CalendarClient({ sessionUser }: { sessionUser: any }) {
   const [isAddingEvent, setIsAddingEvent] = useState<Date | null>(null);
   const [newEventTitle, setNewEventTitle] = useState("");
   const [newEventDesc, setNewEventDesc] = useState("");
-  
+
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  const [isEditingEvent, setIsEditingEvent] = useState(false);
+  const [editEventTitle, setEditEventTitle] = useState("");
+  const [editEventDesc, setEditEventDesc] = useState("");
 
   const getDaysInMonth = (year: number, month: number) => {
     return new Date(year, month + 1, 0).getDate();
@@ -59,10 +63,10 @@ export function CalendarClient({ sessionUser }: { sessionUser: any }) {
       if (!saltData.success) throw new Error("Vault not initialized.");
 
       const key = await deriveKey(masterPassword, saltData.salt);
-      
+
       const validationRes = await fetch("/api/vault/verify");
       const validationData = await validationRes.json();
-      
+
       try {
         await decryptTextWithAES(key, validationData.encrypted_validation);
       } catch (err) {
@@ -84,7 +88,7 @@ export function CalendarClient({ sessionUser }: { sessionUser: any }) {
     const calData = await calRes.json();
     let defaultCalendar = null;
     let loadedCalendars = [];
-    
+
     if (calData.success && calData.calendars.length > 0) {
       loadedCalendars = calData.calendars;
       defaultCalendar = calData.calendars[0];
@@ -93,14 +97,14 @@ export function CalendarClient({ sessionUser }: { sessionUser: any }) {
       const encryptedName = await encryptTextWithAES(key, "My Calendar");
       const createRes = await fetch("/api/calendars", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: withCsrfHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ encrypted_name: encryptedName, color_hex: "#e74c3c" })
       });
       const createData = await createRes.json();
       loadedCalendars = [createData.calendar];
       defaultCalendar = createData.calendar;
     }
-    
+
     setCalendars(loadedCalendars);
 
     // Fetch events for current month
@@ -129,17 +133,17 @@ export function CalendarClient({ sessionUser }: { sessionUser: any }) {
   const handleCreateEvent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!calendars.length || !masterKey || !isAddingEvent || !newEventTitle.trim()) return;
-    
+
     setLoading(true);
     try {
       const encryptedTitle = await encryptTextWithAES(masterKey, newEventTitle);
       const encryptedDesc = newEventDesc.trim() ? await encryptTextWithAES(masterKey, newEventDesc) : null;
-      
+
       const eventDate = new Date(isAddingEvent.getFullYear(), isAddingEvent.getMonth(), isAddingEvent.getDate(), 12, 0);
 
       const res = await fetch("/api/calendars/events", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: withCsrfHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
           calendar_id: calendars[0].id,
           encrypted_title: encryptedTitle,
@@ -156,7 +160,7 @@ export function CalendarClient({ sessionUser }: { sessionUser: any }) {
         data.event.title = newEventTitle;
         data.event.description = newEventDesc;
         setEvents([...events, data.event]);
-        
+
         setIsAddingEvent(null);
         setNewEventTitle("");
         setNewEventDesc("");
@@ -171,11 +175,48 @@ export function CalendarClient({ sessionUser }: { sessionUser: any }) {
   const handleDeleteEvent = async (eventId: string) => {
     if (!confirm("Delete this event?")) return;
     try {
-      await fetch(`/api/calendars/events?id=${eventId}`, { method: "DELETE" });
+      await fetch(`/api/calendars/events?id=${eventId}`, { method: "DELETE", headers: withCsrfHeaders() });
       setEvents(events.filter(e => e.id !== eventId));
       setSelectedEvent(null);
+      setIsEditingEvent(false);
     } catch (err) {
       console.error(err);
+    }
+  };
+  const startEditingEvent = (event: any) => {
+    setEditEventTitle(event.title || "");
+    setEditEventDesc(event.description || "");
+    setIsEditingEvent(true);
+  };
+
+  const handleUpdateEvent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedEvent || !masterKey || !editEventTitle.trim()) return;
+
+    setLoading(true);
+    try {
+      const encryptedTitle = await encryptTextWithAES(masterKey, editEventTitle);
+      const encryptedDesc = editEventDesc.trim() ? await encryptTextWithAES(masterKey, editEventDesc) : null;
+      const res = await fetch("/api/calendars/events", {
+        method: "PATCH",
+        headers: withCsrfHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({
+          event_id: selectedEvent.id,
+          encrypted_title: encryptedTitle,
+          encrypted_description: encryptedDesc
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        const updated = { ...selectedEvent, ...data.event, title: editEventTitle, description: editEventDesc };
+        setEvents(events.map(event => event.id === selectedEvent.id ? updated : event));
+        setSelectedEvent(updated);
+        setIsEditingEvent(false);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -189,12 +230,12 @@ export function CalendarClient({ sessionUser }: { sessionUser: any }) {
             Your schedule is End-to-End Encrypted. Enter your Master Vault Password to unlock it.
           </p>
           <form onSubmit={handleUnlock} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-            <input 
-              type="password" 
-              placeholder="Master Password" 
-              value={masterPassword} 
+            <input
+              type="password"
+              placeholder="Master Password"
+              value={masterPassword}
               onChange={e => setMasterPassword(e.target.value)}
-              className="input-field" 
+              className="input-field"
               required
             />
             {error && <div style={{ color: "var(--accent-red)", fontSize: "0.9rem" }}>{error}</div>}
@@ -252,7 +293,7 @@ export function CalendarClient({ sessionUser }: { sessionUser: any }) {
             {paddingDays.map(i => (
               <div key={`pad-${i}`} style={{ borderRight: "1px solid var(--glass-border)", borderBottom: "1px solid var(--glass-border)", opacity: 0.3 }} />
             ))}
-            
+
             {days.map(day => {
               const dayEvents = events.filter(e => {
                 const eDate = new Date(e.start_time);
@@ -260,17 +301,17 @@ export function CalendarClient({ sessionUser }: { sessionUser: any }) {
               });
 
               return (
-                <div 
-                  key={day} 
-                  onClick={() => setIsAddingEvent(new Date(currentDate.getFullYear(), currentDate.getMonth(), day))} 
-                  style={{ padding: "0.5rem", borderRight: "1px solid var(--glass-border)", borderBottom: "1px solid var(--glass-border)", position: "relative", cursor: "pointer", overflow: "hidden" }} 
+                <div
+                  key={day}
+                  onClick={() => setIsAddingEvent(new Date(currentDate.getFullYear(), currentDate.getMonth(), day))}
+                  style={{ padding: "0.5rem", borderRight: "1px solid var(--glass-border)", borderBottom: "1px solid var(--glass-border)", position: "relative", cursor: "pointer", overflow: "hidden" }}
                   className="hover:bg-[rgba(255,255,255,0.05)]"
                 >
                   <span style={{ fontSize: "0.9rem", color: "var(--text-secondary)", fontWeight: "600" }}>{day}</span>
                   <div style={{ marginTop: "0.5rem", display: "flex", flexDirection: "column", gap: "0.25rem" }}>
                     {dayEvents.map(e => (
-                      <div 
-                        key={e.id} 
+                      <div
+                        key={e.id}
                         onClick={(ev) => { ev.stopPropagation(); setSelectedEvent(e); }}
                         style={{ background: "rgba(231,76,60,0.2)", border: "1px solid rgba(231,76,60,0.5)", color: "#fff", padding: "0.25rem 0.5rem", borderRadius: "4px", fontSize: "0.75rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: "pointer" }}
                         className="hover:bg-red-500 hover:border-red-600 transition-colors"
@@ -296,7 +337,7 @@ export function CalendarClient({ sessionUser }: { sessionUser: any }) {
             <form onSubmit={handleCreateEvent} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
               <input type="text" placeholder="Event Title" className="input-field" value={newEventTitle} onChange={e => setNewEventTitle(e.target.value)} required autoFocus />
               <textarea placeholder="Description (Optional)" className="input-field" value={newEventDesc} onChange={e => setNewEventDesc(e.target.value)} rows={3} />
-              
+
               <div style={{ display: "flex", gap: "1rem", marginTop: "1rem" }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setIsAddingEvent(null)} style={{ flex: 1 }}>Cancel</button>
                 <button type="submit" className="btn btn-primary" disabled={loading} style={{ flex: 1 }}>{loading ? "Encrypting..." : "Save Event"}</button>
@@ -308,24 +349,42 @@ export function CalendarClient({ sessionUser }: { sessionUser: any }) {
 
       {/* Event Details Modal */}
       {selectedEvent && (
-        <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, backdropFilter: "blur(4px)" }} onClick={() => setSelectedEvent(null)}>
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, backdropFilter: "blur(4px)" }} onClick={() => { setSelectedEvent(null); setIsEditingEvent(false); }}>
           <div style={{ background: "var(--bg-main)", padding: "2rem", borderRadius: "var(--radius-lg)", border: "1px solid var(--glass-border)", width: "400px", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)" }} onClick={e => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem" }}>
-              <h2 style={{ fontSize: "1.25rem", fontWeight: "600", wordBreak: "break-word" }}>{selectedEvent.title}</h2>
-              <button onClick={() => setSelectedEvent(null)} style={{ background: "none", border: "none", color: "var(--text-secondary)", cursor: "pointer" }}><X size={20} /></button>
+              <h2 style={{ fontSize: "1.25rem", fontWeight: "600", wordBreak: "break-word" }}>{isEditingEvent ? "Edit Event" : selectedEvent.title}</h2>
+              <button onClick={() => { setSelectedEvent(null); setIsEditingEvent(false); }} style={{ background: "none", border: "none", color: "var(--text-secondary)", cursor: "pointer" }}><X size={20} /></button>
             </div>
-            
-            {selectedEvent.description && (
-              <div style={{ marginBottom: "1.5rem", color: "var(--text-secondary)", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                {selectedEvent.description}
-              </div>
+
+            {isEditingEvent ? (
+              <form onSubmit={handleUpdateEvent} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                <input type="text" className="input-field" value={editEventTitle} onChange={e => setEditEventTitle(e.target.value)} required autoFocus />
+                <textarea className="input-field" value={editEventDesc} onChange={e => setEditEventDesc(e.target.value)} rows={3} placeholder="Description (Optional)" />
+                <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end" }}>
+                  <button type="button" className="btn btn-secondary" onClick={() => setIsEditingEvent(false)}>Cancel</button>
+                  <button type="submit" className="btn btn-primary" disabled={loading} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <Check size={16} /> {loading ? "Saving..." : "Save"}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <>
+                {selectedEvent.description && (
+                  <div style={{ marginBottom: "1.5rem", color: "var(--text-secondary)", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                    {selectedEvent.description}
+                  </div>
+                )}
+
+                <div style={{ borderTop: "1px solid var(--glass-border)", paddingTop: "1.5rem", display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
+                  <button onClick={() => startEditingEvent(selectedEvent)} className="btn btn-secondary" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <Edit2 size={16} /> Edit Event
+                  </button>
+                  <button onClick={() => handleDeleteEvent(selectedEvent.id)} className="btn btn-secondary" style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "var(--accent-red)", borderColor: "var(--accent-red)" }}>
+                    <Trash2 size={16} /> Delete Event
+                  </button>
+                </div>
+              </>
             )}
-            
-            <div style={{ borderTop: "1px solid var(--glass-border)", paddingTop: "1.5rem", display: "flex", justifyContent: "flex-end" }}>
-              <button onClick={() => handleDeleteEvent(selectedEvent.id)} className="btn btn-secondary" style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "var(--accent-red)", borderColor: "var(--accent-red)" }}>
-                <Trash2 size={16} /> Delete Event
-              </button>
-            </div>
           </div>
         </div>
       )}

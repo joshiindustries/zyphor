@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Plus, MoreHorizontal, Shield } from "lucide-react";
 import { decryptTextWithAES, encryptTextWithAES, base64ToArrayBuffer } from "@/lib/crypto";
+import { withCsrfHeaders } from "@/lib/csrf-client";
 
 export function KanbanClient({ boardId }: { boardId: string }) {
   const [boardTitle, setBoardTitle] = useState("Loading Board...");
@@ -85,7 +86,7 @@ export function KanbanClient({ boardId }: { boardId: string }) {
       
       const res = await fetch("/api/tasks/items", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: withCsrfHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
           column_id: colId,
           encrypted_title: encryptedTitle,

@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { getUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { noStoreJson } from "@/lib/security";
+import { deleteVaultObject, isPersistableVaultStoragePath } from "@/lib/cloud-storage";
 export const dynamic = "force-dynamic";
 
 
@@ -53,6 +54,10 @@ export async function POST(request: NextRequest) {
 
     if (!encrypted_metadata || !storage_path) {
       return noStoreJson({ error: "Missing required fields" }, { status: 400 });
+    }
+
+    if (!isPersistableVaultStoragePath(user.id, storage_path)) {
+      return noStoreJson({ error: "Invalid vault storage path" }, { status: 400 });
     }
 
     if (folder_id) {
@@ -140,6 +145,8 @@ export async function DELETE(request: NextRequest) {
     if (!file || file.user_id !== user.id) {
       return noStoreJson({ error: "File not found or forbidden" }, { status: 404 });
     }
+
+    await deleteVaultObject(user.id, file.storage_path);
 
     await prisma.vaultFile.delete({
       where: { id: fileId }

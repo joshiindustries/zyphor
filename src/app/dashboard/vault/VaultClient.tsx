@@ -2,8 +2,9 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { Folder, File as FileIcon, Upload, Star, Trash2, ArrowLeft, Download, Trash, Loader2, X, Eye } from "lucide-react";
+import { Folder, File as FileIcon, Upload, Star, Trash2, ArrowLeft, Download, Trash, Loader2, X, Eye, Cloud } from "lucide-react";
 import { encryptFile, decryptData } from "@/lib/crypto";
+import { withCsrfHeaders } from "@/lib/csrf-client";
 
 export function VaultClient({ initialFiles }: { initialFiles: any[] }) {
   const [files, setFiles] = useState<any[]>(initialFiles);
@@ -13,6 +14,8 @@ export function VaultClient({ initialFiles }: { initialFiles: any[] }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [currentFilter, setCurrentFilter] = useState<"ALL" | "FAVORITES" | "TRASH">("ALL");
+  const [cloudConnections, setCloudConnections] = useState<any[]>([]);
+  const [selectedStorageTarget, setSelectedStorageTarget] = useState("zyphor");
 
   // Preview Modal State
   const [previewFile, setPreviewFile] = useState<{ name: string, type: string, url: string | null } | null>(null);
@@ -28,6 +31,23 @@ export function VaultClient({ initialFiles }: { initialFiles: any[] }) {
         sessionStorage.setItem("zyphor_vault_pwd", p);
       }
     }
+  }, []);
+  useEffect(() => {
+    const loadCloudConnections = async () => {
+      try {
+        const res = await fetch("/api/cloud-connections");
+        const data = await res.json();
+        if (data.success) {
+          setCloudConnections(data.connections || []);
+          const defaultConnection = (data.connections || []).find((connection: any) => connection.is_default);
+          if (defaultConnection) setSelectedStorageTarget(defaultConnection.id);
+        }
+      } catch (err) {
+        console.error("Failed to load cloud connections", err);
+      }
+    };
+
+    loadCloudConnections();
   }, []);
 
   const arrayBufferToBase64 = (buffer: ArrayBuffer | Uint8Array) => {
@@ -61,9 +81,13 @@ export function VaultClient({ initialFiles }: { initialFiles: any[] }) {
         // 2. Upload Encrypted Blob
         const formData = new FormData();
         formData.append("file", encryptedData, file.name + ".enc");
+        if (selectedStorageTarget !== "zyphor") {
+          formData.append("connectionId", selectedStorageTarget);
+        }
         
         const uploadRes = await fetch("/api/vault/upload", {
           method: "POST",
+          headers: withCsrfHeaders(),
           body: formData
         });
         const uploadData = await uploadRes.json();
@@ -80,7 +104,7 @@ export function VaultClient({ initialFiles }: { initialFiles: any[] }) {
 
         const metaRes = await fetch("/api/vault/files", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: withCsrfHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify({
             encrypted_metadata: JSON.stringify(metadata),
             storage_path: uploadData.storage_path
@@ -186,7 +210,7 @@ export function VaultClient({ initialFiles }: { initialFiles: any[] }) {
     try {
       const res = await fetch(`/api/vault/files/${fileRec.id}/favorite`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: withCsrfHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ is_favorite: !fileRec.is_favorite })
       });
       const data = await res.json();
@@ -202,7 +226,7 @@ export function VaultClient({ initialFiles }: { initialFiles: any[] }) {
     try {
       const res = await fetch(`/api/vault/files`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: withCsrfHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ id: fileRec.id, is_trashed: true })
       });
       const data = await res.json();
@@ -218,7 +242,7 @@ export function VaultClient({ initialFiles }: { initialFiles: any[] }) {
     try {
       const res = await fetch(`/api/vault/files`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: withCsrfHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ id: fileRec.id, is_trashed: false })
       });
       const data = await res.json();
@@ -234,7 +258,8 @@ export function VaultClient({ initialFiles }: { initialFiles: any[] }) {
     if (!confirm("Are you sure you want to permanently delete this file? This cannot be undone.")) return;
     try {
       const res = await fetch(`/api/vault/files?id=${fileRec.id}`, {
-        method: "DELETE"
+        method: "DELETE",
+        headers: withCsrfHeaders()
       });
       if (res.ok) {
         setFiles(files.filter(f => f.id !== fileRec.id));
@@ -294,6 +319,22 @@ export function VaultClient({ initialFiles }: { initialFiles: any[] }) {
               {uploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
               {uploading && uploadProgress ? `Encrypting (${uploadProgress.current}/${uploadProgress.total})...` : "Upload Files"}
             </button>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", padding: "0.75rem", border: "1px solid var(--glass-border)", borderRadius: "var(--radius-sm)", background: "rgba(255,255,255,0.03)", marginBottom: "1rem" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.8rem", color: "var(--text-secondary)", fontWeight: "600" }}>
+                <Cloud size={14} /> Storage Target
+              </label>
+              <select
+                value={selectedStorageTarget}
+                onChange={(e) => setSelectedStorageTarget(e.target.value)}
+                style={{ width: "100%", background: "var(--bg-main)", color: "#fff", border: "1px solid var(--glass-border)", borderRadius: "var(--radius-sm)", padding: "0.5rem" }}
+              >
+                <option value="zyphor">Zyphor Cloud</option>
+                {cloudConnections.map(connection => (
+                  <option key={connection.id} value={connection.id}>{connection.name}</option>
+                ))}
+              </select>
+              <Link href="/dashboard/cloud" style={{ color: "var(--accent-blue)", textDecoration: "none", fontSize: "0.8rem" }}>Manage cloud</Link>
+            </div>
             <div onClick={() => setCurrentFilter("ALL")} style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.75rem", background: currentFilter === "ALL" ? "rgba(255,255,255,0.1)" : "transparent", borderRadius: "var(--radius-sm)", cursor: "pointer", fontWeight: currentFilter === "ALL" ? "600" : "normal" }}>
               <Folder size={18} color="var(--accent-blue)" /> My Vault
             </div>

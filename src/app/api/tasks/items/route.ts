@@ -70,6 +70,17 @@ export async function PUT(request: NextRequest) {
       return noStoreJson({ error: "Not found" }, { status: 404 });
     }
 
+    if (column_id !== undefined) {
+      const targetColumn = await prisma.taskColumn.findUnique({
+        where: { id: column_id },
+        include: { board: true }
+      });
+
+      if (!targetColumn || targetColumn.board.user_id !== user.id || targetColumn.board_id !== existing.column.board_id) {
+        return noStoreJson({ error: "Target column not found" }, { status: 404 });
+      }
+    }
+
     const updateData: any = {};
     if (column_id !== undefined) updateData.column_id = column_id;
     if (order !== undefined) updateData.order = order;

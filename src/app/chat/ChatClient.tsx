@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { ArrowLeft, MessageSquare, Plus, Lock, Send, Users, Video, Edit2, Trash2, Reply, Smile, X, Paperclip, Flame } from "lucide-react";
+import { ArrowLeft, MessageSquare, Plus, Lock, Send, Users, Video, Phone, Edit2, Trash2, Reply, Smile, X, Paperclip, Flame } from "lucide-react";
 import { encryptMessage, decryptMessage } from "@/lib/key-exchange";
 import { withCsrfHeaders } from "@/lib/csrf-client";
 
@@ -15,20 +15,20 @@ function AttachmentRenderer({ attachment }: { attachment: any }) {
     try {
       const res = await fetch(attachment.url);
       const encryptedBuffer = await res.arrayBuffer();
-      
+
       const rawKey = new Uint8Array(window.atob(attachment.aesKey).split("").map(c => c.charCodeAt(0)));
       const aesKey = await window.crypto.subtle.importKey(
         "raw", rawKey, { name: "AES-GCM" }, false, ["decrypt"]
       );
-      
+
       const iv = new Uint8Array(window.atob(attachment.iv).split("").map(c => c.charCodeAt(0)));
-      
+
       const decryptedBuffer = await window.crypto.subtle.decrypt(
         { name: "AES-GCM", iv },
         aesKey,
         encryptedBuffer
       );
-      
+
       const blob = new Blob([decryptedBuffer], { type: attachment.type });
       const url = URL.createObjectURL(blob);
       setDecryptedUrl(url);
@@ -54,7 +54,7 @@ function AttachmentRenderer({ attachment }: { attachment: any }) {
       </div>
     );
   }
-  
+
   if (attachment.type.startsWith("video/")) {
     return decryptedUrl ? (
       <video src={decryptedUrl} controls style={{ maxWidth: "300px", borderRadius: "8px", marginTop: "0.5rem" }} />
@@ -90,14 +90,14 @@ function MessageContentRenderer({ msg, isMe }: { msg: any, isMe: boolean }) {
 
     let displayMsg = msg.encrypted_content;
     if (displayMsg.startsWith("ENC_GROUP:")) displayMsg = window.atob(displayMsg.split(":")[1]);
-    
+
     let parsed: any = null;
     try { parsed = JSON.parse(displayMsg); } catch (e) {}
 
     if (parsed && parsed.viewOnce && !isMe) {
       // Fire delete to server immediately
       fetch(`/api/chat/messages?id=${msg.id}`, { method: 'DELETE', headers: withCsrfHeaders() }).catch(console.error);
-      
+
       setTimeLeft(15);
       const timer = setInterval(() => {
         setTimeLeft(prev => {
@@ -121,10 +121,10 @@ function MessageContentRenderer({ msg, isMe }: { msg: any, isMe: boolean }) {
   if (msg.is_deleted) {
     return <div style={{ fontStyle: "italic", opacity: 0.7 }}>🚫 This message was deleted</div>;
   }
-  
+
   let displayMsg = msg.encrypted_content;
   if (displayMsg.startsWith("ENC_GROUP:")) displayMsg = window.atob(displayMsg.split(":")[1]);
-  
+
   let parsed: any = null;
   try { parsed = JSON.parse(displayMsg); } catch (e) {}
 
@@ -147,12 +147,12 @@ function MessageContentRenderer({ msg, isMe }: { msg: any, isMe: boolean }) {
   );
 }
 
-export default function ChatClient({ 
-  sessionUser, 
+export default function ChatClient({
+  sessionUser,
   initialConversations,
   initialGroups = []
-}: { 
-  sessionUser: any, 
+}: {
+  sessionUser: any,
   initialConversations: any[],
   initialGroups?: any[]
 }) {
@@ -233,7 +233,7 @@ export default function ChatClient({
         console.error(err);
       }
     };
-    
+
     fetchActiveCalls();
     const callInterval = setInterval(fetchActiveCalls, 3000);
     return () => clearInterval(callInterval);
@@ -241,7 +241,7 @@ export default function ChatClient({
 
   useEffect(() => {
     if (!activeId) return;
-    
+
     const fetchMessages = async () => {
       let url = "";
       if (activeType === "dm") url = `/api/chat/messages?conversationId=${activeId}`;
@@ -255,11 +255,11 @@ export default function ChatClient({
     };
 
     const fetchKey = async () => {
-      if (activeType === "group") return; 
+      if (activeType === "group") return;
       const activeConv = initialConversations.find((c: any) => c.id === activeId);
       if (!activeConv) return;
       const otherUserId = activeConv.user1_id === sessionUser.id ? activeConv.user2_id : activeConv.user1_id;
-      
+
       const res = await fetch(`/api/keys?userId=${otherUserId}`);
       const data = await res.json();
       if (data.success) {
@@ -294,7 +294,7 @@ export default function ChatClient({
         if (!recipientPublicKey) throw new Error("Missing recipient public key");
         encryptedPayload = await encryptMessage(plaintextPayload, recipientPublicKey);
       } else {
-        encryptedPayload = "ENC_GROUP:" + btoa(plaintextPayload); 
+        encryptedPayload = "ENC_GROUP:" + btoa(plaintextPayload);
       }
 
       if (editingMsg) {
@@ -374,7 +374,7 @@ export default function ChatClient({
       }
 
       if (!currentReactions[emoji]) currentReactions[emoji] = [];
-      
+
       const userIndex = currentReactions[emoji].indexOf(sessionUser.id);
       if (userIndex > -1) {
         currentReactions[emoji].splice(userIndex, 1); // toggle off
@@ -392,7 +392,7 @@ export default function ChatClient({
         headers: withCsrfHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ reactions: encryptedReactions })
       });
-      
+
       const data = await res.json();
       if (data.success) {
         setMessages(messages.map(m => m.id === msg.id ? data.message : m));
@@ -410,11 +410,11 @@ export default function ChatClient({
     try {
       // 1. Generate a random encryption key for the file
       const encryptionKey = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10);
-      
+
       // 2. Encrypt file using the same logic as the main upload area
       const { encryptFile } = await import("@/lib/crypto");
       const { encryptedData, salt, iv } = await encryptFile(file, encryptionKey);
-      
+
       const formData = new FormData();
       formData.append("maxDownloads", "0");
       formData.append("isProtected", "true");
@@ -425,7 +425,7 @@ export default function ChatClient({
       formData.append("iv", window.btoa(String.fromCharCode(...Array.from(iv))));
       formData.append("originalName", file.name);
       formData.append("originalMime", file.type || "application/octet-stream");
-      
+
       const { withCsrfHeaders } = await import("@/lib/csrf-client");
 
       // 3. Upload to main /api/upload endpoint
@@ -435,7 +435,7 @@ export default function ChatClient({
         body: formData
       });
       const data = await res.json();
-      
+
       if (data.success) {
         // 4. Set the input text to the secure share link so the user can send it
         const linkDetail = `${window.location.origin}/${data.linkId}#${encryptionKey}`;
@@ -454,15 +454,15 @@ export default function ChatClient({
 
   const handleCreateGroup = async () => {
     if (!newGroupName.trim() || selectedGroupMembers.length === 0) return;
-    
+
     setLoading(true);
     try {
       const members = [{ user_id: sessionUser.id, encrypted_key: "MOCK_KEY" }];
-      
+
       for (const member of selectedGroupMembers) {
         members.push({ user_id: member.id, encrypted_key: "MOCK_KEY_FOR_" + member.id });
       }
-      
+
       const res = await fetch("/api/groups", {
         method: "POST",
         headers: withCsrfHeaders({ "Content-Type": "application/json" }),
@@ -471,7 +471,7 @@ export default function ChatClient({
           members
         })
       });
-      
+
       if (res.ok) {
         window.location.reload();
       }
@@ -479,6 +479,25 @@ export default function ChatClient({
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+  const startCall = async (mediaType: "AUDIO" | "VIDEO") => {
+    if (!activeId || activeType !== "dm") return;
+
+    try {
+      const res = await fetch("/api/calls", {
+        method: "POST",
+        headers: withCsrfHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ conversation_id: activeId, media_type: mediaType })
+      });
+      const data = await res.json();
+      if (data.success && data.call) {
+        window.location.href = `/chat/call/${data.call.id}`;
+      } else if (data.error) {
+        alert(data.error);
+      }
+    } catch (err) {
+      console.error("Failed to start call", err);
     }
   };
 
@@ -510,9 +529,9 @@ export default function ChatClient({
       {activeCall && (
         <div style={{ background: "var(--accent-green)", padding: "1rem", display: "flex", justifyContent: "space-between", alignItems: "center", color: "#fff", zIndex: 100 }}>
           <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-            <Video size={24} />
+            {activeCall.media_type === "AUDIO" ? <Phone size={24} /> : <Video size={24} />}
             <div>
-              <strong style={{ display: "block" }}>Incoming Video Call</strong>
+              <strong style={{ display: "block" }}>{activeCall.media_type === "AUDIO" ? "Incoming Audio Call" : "Incoming Video Call"}</strong>
               <span style={{ fontSize: "0.85rem" }}>from {activeCall.caller.name}</span>
             </div>
           </div>
@@ -525,9 +544,16 @@ export default function ChatClient({
               });
               setActiveCall(null);
             }}>Decline</button>
-            <Link href={`/chat/call/${activeCall.id}`} className="btn btn-primary" style={{ background: "#fff", color: "var(--accent-green)" }}>
+            <button className="btn btn-primary" style={{ background: "#fff", color: "var(--accent-green)", border: "none" }} onClick={async () => {
+              await fetch("/api/calls", {
+                method: "PATCH",
+                headers: withCsrfHeaders({ "Content-Type": "application/json" }),
+                body: JSON.stringify({ call_id: activeCall.id, status: "ONGOING" })
+              });
+              window.location.href = `/chat/call/${activeCall.id}`;
+            }}>
               Accept
-            </Link>
+            </button>
           </div>
         </div>
       )}
@@ -545,7 +571,7 @@ export default function ChatClient({
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
         {/* Sidebar */}
         <div style={{ width: "320px", borderRight: "1px solid var(--glass-border)", background: "rgba(0,0,0,0.2)", display: "flex", flexDirection: "column" }}>
-          
+
           <div style={{ padding: "1rem", borderBottom: "1px solid var(--glass-border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <h2 style={{ fontSize: "1.1rem", fontWeight: "600" }}>Chats</h2>
             <button className="btn btn-primary" style={{ padding: "0.4rem", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setIsCreatingGroup(!isCreatingGroup)}>
@@ -555,23 +581,23 @@ export default function ChatClient({
 
           {isCreatingGroup && (
             <div style={{ padding: "1rem", borderBottom: "1px solid var(--glass-border)", background: "rgba(255,255,255,0.05)" }}>
-              <input 
-                type="text" 
-                placeholder="Group Name" 
-                value={newGroupName} 
+              <input
+                type="text"
+                placeholder="Group Name"
+                value={newGroupName}
                 onChange={e => setNewGroupName(e.target.value)}
                 style={{ width: "100%", padding: "0.5rem", borderRadius: "var(--radius-sm)", border: "1px solid var(--glass-border)", background: "var(--bg-main)", color: "#fff", marginBottom: "0.5rem", fontSize: "0.85rem" }}
               />
-              <input 
-                type="text" 
-                placeholder="Search users to add..." 
-                value={groupSearchQuery} 
+              <input
+                type="text"
+                placeholder="Search users to add..."
+                value={groupSearchQuery}
                 onChange={e => setGroupSearchQuery(e.target.value)}
                 style={{ width: "100%", padding: "0.5rem", borderRadius: "var(--radius-sm)", border: "1px solid var(--glass-border)", background: "var(--bg-main)", color: "#fff", marginBottom: "0.5rem", fontSize: "0.85rem" }}
               />
               {groupSearchResults.filter(u => !selectedGroupMembers.find(m => m.id === u.id)).map(u => (
-                <div 
-                  key={u.id} 
+                <div
+                  key={u.id}
                   style={{ padding: "0.5rem", display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", borderRadius: "var(--radius-sm)", background: "rgba(255,255,255,0.05)", marginBottom: "0.25rem" }}
                   onClick={() => setSelectedGroupMembers([...selectedGroupMembers, u])}
                 >
@@ -580,7 +606,7 @@ export default function ChatClient({
                   <Plus size={14} />
                 </div>
               ))}
-              
+
               {selectedGroupMembers.length > 0 && (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "0.25rem", marginBottom: "0.5rem", marginTop: "0.5rem" }}>
                   {selectedGroupMembers.map(u => (
@@ -590,7 +616,7 @@ export default function ChatClient({
                   ))}
                 </div>
               )}
-              
+
               <button className="btn btn-primary" style={{ width: "100%", padding: "0.5rem" }} onClick={handleCreateGroup} disabled={selectedGroupMembers.length === 0 || !newGroupName.trim()}>Create Group</button>
             </div>
           )}
@@ -603,19 +629,19 @@ export default function ChatClient({
                   <Plus size={14} />
                 </button>
               </div>
-              
+
               {isCreatingDM && (
                 <div style={{ padding: "0.5rem", background: "rgba(0,0,0,0.2)", borderRadius: "var(--radius-sm)", marginBottom: "0.5rem" }}>
-                  <input 
-                    type="text" 
-                    placeholder="Search username/email..." 
-                    value={dmSearchQuery} 
+                  <input
+                    type="text"
+                    placeholder="Search username/email..."
+                    value={dmSearchQuery}
                     onChange={e => setDmSearchQuery(e.target.value)}
                     style={{ width: "100%", padding: "0.5rem", borderRadius: "var(--radius-sm)", border: "1px solid var(--glass-border)", background: "var(--bg-main)", color: "#fff", marginBottom: "0.5rem", fontSize: "0.85rem" }}
                   />
                   {dmSearchResults.map(u => (
-                    <div 
-                      key={u.id} 
+                    <div
+                      key={u.id}
                       style={{ padding: "0.5rem", display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", borderRadius: "var(--radius-sm)", background: "rgba(255,255,255,0.05)" }}
                       onClick={async () => {
                         const res = await fetch("/api/chat", {
@@ -683,27 +709,26 @@ export default function ChatClient({
                     </div>
                   </div>
                 </div>
-                
+
                 {activeType === "dm" && (
-                  <button 
-                    className="btn btn-secondary" 
-                    style={{ padding: "0.5rem 1rem", borderRadius: "100px", display: "flex", alignItems: "center", gap: "0.5rem", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#fff", cursor: "pointer" }}
-                    onClick={async () => {
-                      try {
-                        const res = await fetch("/api/calls", {
-                          method: "POST",
-                          headers: withCsrfHeaders({ "Content-Type": "application/json" }),
-                          body: JSON.stringify({ conversation_id: activeId })
-                        });
-                        const data = await res.json();
-                        if (data.success && data.call) {
-                          window.location.href = `/chat/call/${data.call.id}`;
-                        }
-                      } catch (err) {}
-                    }}
-                  >
-                    <Video size={16} /> Video Call
-                  </button>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <button
+                      className="btn btn-secondary"
+                      style={{ padding: "0.5rem 1rem", borderRadius: "100px", display: "flex", alignItems: "center", gap: "0.5rem", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#fff", cursor: "pointer" }}
+                      onClick={() => startCall("AUDIO")}
+                      title="Start audio call"
+                    >
+                      <Phone size={16} /> Audio
+                    </button>
+                    <button
+                      className="btn btn-secondary"
+                      style={{ padding: "0.5rem 1rem", borderRadius: "100px", display: "flex", alignItems: "center", gap: "0.5rem", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#fff", cursor: "pointer" }}
+                      onClick={() => startCall("VIDEO")}
+                      title="Start video call"
+                    >
+                      <Video size={16} /> Video
+                    </button>
+                  </div>
                 )}
               </div>
 
@@ -729,15 +754,15 @@ export default function ChatClient({
                     }
 
                     return (
-                      <div 
-                        key={msg.id} 
+                      <div
+                        key={msg.id}
                         style={{ display: "flex", flexDirection: "column", alignItems: isMe ? "flex-end" : "flex-start", maxWidth: "80%", alignSelf: isMe ? "flex-end" : "flex-start" }}
                         onMouseEnter={() => setHoveredMsgId(msg.id)}
                         onMouseLeave={() => setHoveredMsgId(null)}
                       >
                         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexDirection: isMe ? "row-reverse" : "row" }}>
                           <div style={{ background: isMe ? "var(--accent-blue)" : "var(--glass-bg)", border: isMe ? "none" : "1px solid var(--glass-border)", padding: "0.75rem 1rem", borderRadius: "var(--radius-md)", color: "#fff", position: "relative", minWidth: "100px" }}>
-                            
+
                             {/* Reply Preview */}
                             {parentMsg && (
                               <div style={{ background: "rgba(0,0,0,0.2)", padding: "0.5rem", borderRadius: "var(--radius-sm)", marginBottom: "0.5rem", fontSize: "0.8rem", borderLeft: "3px solid var(--accent-purple)", cursor: "pointer", opacity: 0.8 }}>
@@ -753,7 +778,7 @@ export default function ChatClient({
                             {msg.is_edited && !msg.is_deleted && (
                               <span style={{ fontSize: "0.7rem", opacity: 0.6, marginLeft: "0.5rem" }}>(edited)</span>
                             )}
-                            
+
                             {/* Reactions Inline */}
                             {Object.keys(reactionsObj).length > 0 && (
                               <div style={{ display: "flex", gap: "0.25rem", marginTop: "0.5rem", flexWrap: "wrap" }}>
@@ -789,7 +814,7 @@ export default function ChatClient({
 
               {/* Input Area */}
               <div style={{ padding: "1rem 1.5rem", borderTop: "1px solid var(--glass-border)", background: "rgba(255,255,255,0.02)", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                
+
                 {/* Reply/Edit Previews */}
                 {replyingTo && (
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(0,0,0,0.2)", padding: "0.5rem 1rem", borderRadius: "var(--radius-md)", borderLeft: "3px solid var(--accent-purple)", fontSize: "0.85rem" }}>
@@ -826,8 +851,8 @@ export default function ChatClient({
                   <button type="button" onClick={() => setIsBurnerMode(!isBurnerMode)} style={{ background: "transparent", border: "none", color: isBurnerMode ? "var(--accent-red)" : "var(--text-secondary)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "color 0.2s" }} title="Burner Mode (View Once)">
                     <Flame size={20} />
                   </button>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     value={inputText}
                     onChange={e => setInputText(e.target.value)}
                     placeholder={editingMsg ? "Edit your message..." : "Type an encrypted message..."}

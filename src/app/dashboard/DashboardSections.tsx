@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Globe, FileText, CheckSquare, Calendar, Video, Key, Folder, Shield, Box } from "lucide-react";
+import { Globe, FileText, CheckSquare, Calendar, Video, Key, Folder, Shield, Box, Cloud } from "lucide-react";
 import LinkCard from "./LinkCard";
 
 export default function DashboardSections({ links, savedLinks }: { links: any[], savedLinks: any[] }) {
@@ -18,6 +18,7 @@ export default function DashboardSections({ links, savedLinks }: { links: any[],
     { href: "/dashboard/setup-keys", icon: <Key size={32} color="#f1c40f" />, bg: "rgba(241, 196, 15, 0.1)", label: "Device Keys" },
     { href: "/dashboard/passwords", icon: <Key size={32} color="#e74c3c" />, bg: "rgba(231, 76, 60, 0.1)", label: "Passwords" },
     { href: "/dashboard/vault", icon: <Folder size={32} color="#10b981" />, bg: "rgba(16, 185, 129, 0.1)", label: "Cloud Vault" },
+    { href: "/dashboard/cloud", icon: <Cloud size={32} color="#38bdf8" />, bg: "rgba(56, 189, 248, 0.1)", label: "Own Cloud" },
     { href: "/dashboard/security", icon: <Shield size={32} color="#8e44ad" />, bg: "rgba(142, 68, 173, 0.1)", label: "Security Center" },
     { href: "/dashboard/drop", icon: <Box size={32} color="#3b82f6" />, bg: "rgba(59, 130, 246, 0.1)", label: "Drop Inbox" },
   ];

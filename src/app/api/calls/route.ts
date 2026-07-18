@@ -4,6 +4,14 @@ import { prisma } from "@/lib/db";
 import { noStoreJson } from "@/lib/security";
 export const dynamic = "force-dynamic";
 
+const CALL_STATUSES = new Set(["RINGING", "ONGOING", "ENDED", "MISSED", "REJECTED"]);
+const CALL_MEDIA_TYPES = new Set(["AUDIO", "VIDEO"]);
+
+function normalizeMediaType(value: unknown): "AUDIO" | "VIDEO" {
+  if (typeof value !== "string") return "VIDEO";
+  const mediaType = value.toUpperCase();
+  return CALL_MEDIA_TYPES.has(mediaType) ? (mediaType as "AUDIO" | "VIDEO") : "VIDEO";
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,7 +20,6 @@ export async function GET(request: NextRequest) {
       return noStoreJson({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get active calls for user's conversations
     const calls = await prisma.call.findMany({
       where: {
         conversation: {
@@ -44,13 +51,12 @@ export async function POST(request: NextRequest) {
       return noStoreJson({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { conversation_id } = await request.json();
+    const { conversation_id, media_type } = await request.json();
 
     if (!conversation_id) {
       return noStoreJson({ error: "conversation_id required" }, { status: 400 });
     }
 
-    // Ensure user is in conversation
     const conversation = await prisma.conversation.findUnique({
       where: { id: conversation_id }
     });
@@ -59,7 +65,6 @@ export async function POST(request: NextRequest) {
       return noStoreJson({ error: "Invalid conversation" }, { status: 400 });
     }
 
-    // Check if there's already an active call
     const activeCall = await prisma.call.findFirst({
       where: {
         conversation_id,
@@ -75,6 +80,7 @@ export async function POST(request: NextRequest) {
       data: {
         conversation_id,
         caller_id: user.id,
+        media_type: normalizeMediaType(media_type),
         status: "RINGING"
       }
     });
@@ -98,6 +104,11 @@ export async function PATCH(request: NextRequest) {
       return noStoreJson({ error: "call_id and status required" }, { status: 400 });
     }
 
+    const nextStatus = typeof status === "string" ? status.toUpperCase() : "";
+    if (!CALL_STATUSES.has(nextStatus)) {
+      return noStoreJson({ error: "Invalid call status" }, { status: 400 });
+    }
+
     const call = await prisma.call.findUnique({
       where: { id: call_id },
       include: { conversation: true }
@@ -110,8 +121,8 @@ export async function PATCH(request: NextRequest) {
     const updatedCall = await prisma.call.update({
       where: { id: call_id },
       data: {
-        status,
-        ended_at: ["ENDED", "MISSED", "REJECTED"].includes(status) ? new Date() : null
+        status: nextStatus,
+        ended_at: ["ENDED", "MISSED", "REJECTED"].includes(nextStatus) ? new Date() : null
       }
     });
 

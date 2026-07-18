@@ -39,6 +39,7 @@ model User {
   vault_folders         VaultFolder[]
   vault_files           VaultFile[]
   vault_tags            VaultTag[]
+  cloud_connections     CloudConnection[]
   calls_initiated       Call[] @relation("Caller")
   signals_sent          CallSignal[]
   notes                 Note[]
@@ -343,10 +344,26 @@ model VaultTag {
   @@map("vault_tags")
 }
 
+model CloudConnection {
+  id                    String   @id @default(uuid())
+  user_id               String
+  provider              String
+  name                  String
+  encrypted_credentials String   @db.Text
+  is_default            Boolean  @default(false)
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
+
+  user                  User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, provider])
+  @@map("cloud_connections")
+}
 model Call {
   id              String      @id @default(uuid())
   conversation_id String
   caller_id       String
+  media_type      String      @default("VIDEO") // AUDIO or VIDEO
   status          String      @default("RINGING") // RINGING, ONGOING, ENDED, MISSED
   started_at      DateTime    @default(now())
   ended_at        DateTime?

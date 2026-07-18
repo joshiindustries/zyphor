@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Kanban, Plus } from "lucide-react";
 import { generateAESKey, encryptTextWithAES } from "@/lib/crypto";
 import { useRouter } from "next/navigation";
+import { withCsrfHeaders } from "@/lib/csrf-client";
 
 export function BoardsClient({ initialBoards }: { initialBoards: any[] }) {
   const router = useRouter();
@@ -22,7 +23,7 @@ export function BoardsClient({ initialBoards }: { initialBoards: any[] }) {
       // 3. Save to backend
       const res = await fetch("/api/tasks/boards", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: withCsrfHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ encrypted_title: encryptedPayload })
       });
 

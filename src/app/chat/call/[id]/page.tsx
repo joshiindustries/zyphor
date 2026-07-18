@@ -35,11 +35,12 @@ export default async function CallPage(props: { params: Promise<{ id: string }> 
   const otherUser = call.conversation.user1_id === sessionUser.id ? call.conversation.user2 : call.conversation.user1;
 
   return (
-    <CallClient 
-      callId={call.id} 
-      sessionUserId={sessionUser.id} 
-      isCaller={isCaller} 
-      otherUser={otherUser} 
+    <CallClient
+      callId={call.id}
+      sessionUserId={sessionUser.id}
+      isCaller={isCaller}
+      otherUser={otherUser}
+      mediaType={call.media_type === "AUDIO" ? "AUDIO" : "VIDEO"}
     />
   );
 }

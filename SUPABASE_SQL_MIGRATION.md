@@ -277,10 +277,24 @@ CREATE TABLE "vault_tags" (
 );
 
 -- CreateTable
+CREATE TABLE "cloud_connections" (
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "user_id" UUID NOT NULL,
+    "provider" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "encrypted_credentials" TEXT NOT NULL,
+    "is_default" BOOLEAN NOT NULL DEFAULT false,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "cloud_connections_pkey" PRIMARY KEY ("id")
+);
+-- CreateTable
 CREATE TABLE "calls" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "conversation_id" UUID NOT NULL,
     "caller_id" UUID NOT NULL,
+    "media_type" TEXT NOT NULL DEFAULT 'VIDEO',
     "status" TEXT NOT NULL DEFAULT 'RINGING',
     "started_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "ended_at" TIMESTAMP(3),
@@ -455,6 +469,7 @@ CREATE UNIQUE INDEX "group_members_group_id_user_id_key" ON "group_members"("gro
 CREATE INDEX "group_messages_group_id_created_at_idx" ON "group_messages"("group_id", "created_at");
 CREATE INDEX "chat_attachments_message_id_idx" ON "chat_attachments"("message_id");
 CREATE INDEX "chat_attachments_group_message_id_idx" ON "chat_attachments"("group_message_id");
+CREATE INDEX "cloud_connections_user_id_provider_idx" ON "cloud_connections"("user_id", "provider");
 CREATE INDEX "call_signals_call_id_created_at_idx" ON "call_signals"("call_id", "created_at");
 CREATE UNIQUE INDEX "note_shares_note_id_shared_with_user_id_key" ON "note_shares"("note_id", "shared_with_user_id");
 CREATE UNIQUE INDEX "trusted_devices_device_id_key" ON "trusted_devices"("device_id");
@@ -486,6 +501,7 @@ ALTER TABLE "vault_files" ADD CONSTRAINT "vault_files_user_id_fkey" FOREIGN KEY 
 ALTER TABLE "vault_files" ADD CONSTRAINT "vault_files_folder_id_fkey" FOREIGN KEY ("folder_id") REFERENCES "vault_folders"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 ALTER TABLE "file_versions" ADD CONSTRAINT "file_versions_file_id_fkey" FOREIGN KEY ("file_id") REFERENCES "vault_files"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "vault_tags" ADD CONSTRAINT "vault_tags_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "cloud_connections" ADD CONSTRAINT "cloud_connections_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "calls" ADD CONSTRAINT "calls_conversation_id_fkey" FOREIGN KEY ("conversation_id") REFERENCES "conversations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "calls" ADD CONSTRAINT "calls_caller_id_fkey" FOREIGN KEY ("caller_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "call_signals" ADD CONSTRAINT "call_signals_call_id_fkey" FOREIGN KEY ("call_id") REFERENCES "calls"("id") ON DELETE CASCADE ON UPDATE CASCADE;

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import fs from "fs";
+import { downloadVaultObject } from "@/lib/cloud-storage";
 
 export const dynamic = "force-dynamic";
 
@@ -27,20 +27,19 @@ export async function GET(request: NextRequest) {
       return new NextResponse("File not found or forbidden", { status: 404 });
     }
 
-    if (!fs.existsSync(file.storage_path)) {
-      return new NextResponse("Physical file not found on server", { status: 404 });
-    }
+    const object = await downloadVaultObject(user.id, file.storage_path);
 
-    const fileStream = fs.createReadStream(file.storage_path);
-    
-    return new NextResponse(fileStream as any, {
+    return new NextResponse(object.body, {
       headers: {
-        "Content-Type": "application/octet-stream",
+        "Content-Type": object.contentType,
+        ...(object.contentLength ? { "Content-Length": object.contentLength } : {}),
+        "Cache-Control": "no-store, max-age=0",
+        "X-Content-Type-Options": "nosniff",
       }
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error downloading file:", error);
-    return new NextResponse("Internal server error", { status: 500 });
+    return new NextResponse(error.message || "Internal server error", { status: 500 });
   }
 }

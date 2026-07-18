@@ -1,9 +1,7 @@
 import { NextRequest } from "next/server";
 import { getUser } from "@/lib/auth";
 import { noStoreJson } from "@/lib/security";
-import fs from "fs";
-import path from "path";
-import os from "os";
+import { uploadVaultObject } from "@/lib/cloud-storage";
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,23 +12,25 @@ export async function POST(request: NextRequest) {
 
     const formData = await request.formData();
     const file = formData.get("file") as File;
+    const connectionIdValue = formData.get("connectionId");
+    const connectionId = typeof connectionIdValue === "string" && connectionIdValue ? connectionIdValue : null;
 
     if (!file) {
       return noStoreJson({ error: "No file uploaded" }, { status: 400 });
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    
-    // Use OS temp dir for standard Next.js deployments
-    const tmpDir = os.tmpdir();
-    const uniqueFileName = `${crypto.randomUUID()}-${file.name}`;
-    const storagePath = path.join(tmpDir, uniqueFileName);
-
-    fs.writeFileSync(storagePath, buffer);
+    const storagePath = await uploadVaultObject({
+      userId: user.id,
+      fileName: file.name,
+      bytes: buffer,
+      contentType: file.type || "application/octet-stream",
+      connectionId,
+    });
 
     return noStoreJson({ success: true, storage_path: storagePath });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error uploading file:", error);
-    return noStoreJson({ error: "Internal server error" }, { status: 500 });
+    return noStoreJson({ error: error.message || "Internal server error" }, { status: 500 });
   }
 }

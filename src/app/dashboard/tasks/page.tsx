@@ -5,6 +5,7 @@ import Link from "next/link";
 import { KanbanSquare, Plus, Lock, ArrowRight, CheckCircle } from "lucide-react";
 import { deriveKey, encryptTextWithAES, decryptTextWithAES } from "@/lib/crypto";
 import { useRouter } from "next/navigation";
+import { withCsrfHeaders } from "@/lib/csrf-client";
 
 export default function BoardsList() {
   const router = useRouter();
@@ -88,7 +89,7 @@ export default function BoardsList() {
       const encryptedTitle = await encryptTextWithAES(masterKey, newBoardName);
       const res = await fetch("/api/tasks/boards", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: withCsrfHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ encrypted_title: encryptedTitle })
       });
       const data = await res.json();
@@ -128,7 +129,7 @@ export default function BoardsList() {
 
       const res = await fetch("/api/vault/init", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: withCsrfHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ salt: saltBase64, validation })
       });
       const data = await res.json();

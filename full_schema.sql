@@ -233,10 +233,24 @@ create table if not exists public."vault_tags" (
 );
 
 
+create table if not exists public."cloud_connections" (
+  "id" uuid primary key default gen_random_uuid(),
+  "user_id" uuid not null,
+  "provider" text not null,
+  "name" text not null,
+  "encrypted_credentials" text not null,
+  "is_default" boolean not null default false,
+  "created_at" timestamptz not null default now(),
+  "updated_at" timestamptz not null default now(),
+  constraint "cloud_connections_user_id_fkey" foreign key ("user_id") references public."users"("id") on delete cascade
+);
+
+create index if not exists idx_cloud_connections_user_id_provider on public."cloud_connections"("user_id", "provider");
 create table if not exists public."calls" (
   "id" uuid primary key default gen_random_uuid(),
   "conversation_id" uuid not null,
   "caller_id" uuid not null,
+  "media_type" text not null default 'VIDEO',
   "status" text not null default 'RINGING',
   "started_at" timestamptz not null default now(),
   "ended_at" timestamptz
