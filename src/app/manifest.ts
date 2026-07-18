@@ -6,6 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: 'Zyphor',
     description: 'E2EE Productivity and Secure Vault Suite',
     start_url: '/dashboard',
+    scope: '/',
     display: 'standalone',
     background_color: '#0f1115',
     theme_color: '#0f1115',

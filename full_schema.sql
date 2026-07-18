@@ -318,6 +318,21 @@ create table if not exists public."tasks" (
 );
 
 
+create table if not exists public."notifications" (
+  "id" uuid primary key default gen_random_uuid(),
+  "user_id" uuid not null,
+  "type" text not null,
+  "title" text not null,
+  "body" text,
+  "entity_type" text,
+  "entity_id" text,
+  "link" text,
+  "is_read" boolean not null default false,
+  "created_at" timestamptz not null default now(),
+  constraint "notifications_user_id_fkey" foreign key ("user_id") references public."users"("id") on delete cascade
+);
+
+create index if not exists idx_notifications_user_id_is_read_created_at on public."notifications"("user_id", "is_read", "created_at");
 create table if not exists public."event_calendars" (
   "id" uuid primary key default gen_random_uuid(),
   "user_id" uuid not null,
@@ -383,4 +398,3 @@ create table if not exists public."password_entries" (
   "created_at" timestamptz not null default now(),
   "updated_at" timestamptz not null
 );
-

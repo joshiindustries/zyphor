@@ -1,10 +1,10 @@
 /**
  * Utility for client-side zero-knowledge key generation and encryption.
- * For Phase 3 Secure Chat Foundation.
+ * Handles RSA-OAEP identity keys plus AES-GCM message envelopes.
  */
 
 export async function generateIdentityKeyPair() {
-  const keyPair = await window.crypto.subtle.generateKey(
+  return window.crypto.subtle.generateKey(
     {
       name: "RSA-OAEP",
       modulusLength: 4096,
@@ -14,8 +14,6 @@ export async function generateIdentityKeyPair() {
     true,
     ["encrypt", "decrypt"]
   );
-
-  return keyPair;
 }
 
 export async function exportPublicKey(key: CryptoKey): Promise<string> {
@@ -33,7 +31,7 @@ export async function exportPrivateKey(key: CryptoKey): Promise<string> {
 }
 
 function pemToArrayBuffer(pem: string): ArrayBuffer {
-  const b64Lines = pem.replace(/-----BEGIN [^-]+-----/g, '').replace(/-----END [^-]+-----/g, '').replace(/\s+/g, '');
+  const b64Lines = pem.replace(/-----BEGIN [^-]+-----/g, "").replace(/-----END [^-]+-----/g, "").replace(/\s+/g, "");
   const byteStr = window.atob(b64Lines);
   const bytes = new Uint8Array(byteStr.length);
   for (let i = 0; i < byteStr.length; i++) {
@@ -42,72 +40,129 @@ function pemToArrayBuffer(pem: string): ArrayBuffer {
   return bytes.buffer;
 }
 
-export async function importPublicKey(pem: string): Promise<CryptoKey> {
+function parseMaybeJwk(value: string): JsonWebKey | null {
+  try {
+    const parsed = JSON.parse(value);
+    if (parsed && typeof parsed === "object" && parsed.kty) return parsed as JsonWebKey;
+  } catch {
+    // Not a JWK JSON value.
+  }
+  return null;
+}
+
+export async function importPublicKey(pemOrJwk: string): Promise<CryptoKey> {
+  const jwk = parseMaybeJwk(pemOrJwk);
+  if (jwk) {
+    return window.crypto.subtle.importKey(
+      "jwk",
+      jwk,
+      { name: "RSA-OAEP", hash: "SHA-256" },
+      true,
+      ["encrypt"]
+    );
+  }
+
   return window.crypto.subtle.importKey(
     "spki",
-    pemToArrayBuffer(pem),
+    pemToArrayBuffer(pemOrJwk),
     { name: "RSA-OAEP", hash: "SHA-256" },
     true,
     ["encrypt"]
   );
 }
 
-export async function importPrivateKey(pem: string): Promise<CryptoKey> {
+export async function importPrivateKey(pemOrJwk: string): Promise<CryptoKey> {
+  const jwk = parseMaybeJwk(pemOrJwk);
+  if (jwk) {
+    return window.crypto.subtle.importKey(
+      "jwk",
+      jwk,
+      { name: "RSA-OAEP", hash: "SHA-256" },
+      true,
+      ["decrypt"]
+    );
+  }
+
   return window.crypto.subtle.importKey(
     "pkcs8",
-    pemToArrayBuffer(pem),
+    pemToArrayBuffer(pemOrJwk),
     { name: "RSA-OAEP", hash: "SHA-256" },
     true,
     ["decrypt"]
   );
 }
 
-export async function encryptMessage(text: string, recipientPublicKeyPem: string): Promise<string> {
+export async function encryptMessage(text: string, recipientPublicKeyPem: string, senderPublicKeyPem?: string | null): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(text);
-  
+
   const aesKey = await window.crypto.subtle.generateKey(
     { name: "AES-GCM", length: 256 },
     true,
     ["encrypt", "decrypt"]
   );
-  
+
   const iv = window.crypto.getRandomValues(new Uint8Array(12));
   const encryptedContent = await window.crypto.subtle.encrypt(
     { name: "AES-GCM", iv },
     aesKey,
     data
   );
-  
+
   const rawAesKey = await window.crypto.subtle.exportKey("raw", aesKey);
-  
-  const rsaPubKey = await importPublicKey(recipientPublicKeyPem);
-  const encryptedAesKey = await window.crypto.subtle.encrypt(
-    { name: "RSA-OAEP" },
-    rsaPubKey,
-    rawAesKey
-  );
-  
+  const publicKeys = [recipientPublicKeyPem];
+  if (senderPublicKeyPem && senderPublicKeyPem !== recipientPublicKeyPem) {
+    publicKeys.push(senderPublicKeyPem);
+  }
+
+  const encryptedKeys: string[] = [];
+  for (const publicKey of publicKeys) {
+    const rsaPubKey = await importPublicKey(publicKey);
+    const encryptedAesKey = await window.crypto.subtle.encrypt(
+      { name: "RSA-OAEP" },
+      rsaPubKey,
+      rawAesKey
+    );
+    encryptedKeys.push(window.btoa(String.fromCharCode(...new Uint8Array(encryptedAesKey))));
+  }
+
   return JSON.stringify({
     iv: window.btoa(String.fromCharCode(...new Uint8Array(iv))),
     encryptedContent: window.btoa(String.fromCharCode(...new Uint8Array(encryptedContent))),
-    encryptedAesKey: window.btoa(String.fromCharCode(...new Uint8Array(encryptedAesKey)))
+    encryptedAesKey: encryptedKeys[0],
+    encryptedKeys,
   });
 }
 
 export async function decryptMessage(payload: string, privateKeyPem: string): Promise<string> {
   const parsed = JSON.parse(payload);
-  const iv = new Uint8Array(window.atob(parsed.iv).split("").map(c => c.charCodeAt(0)));
-  const encryptedContent = new Uint8Array(window.atob(parsed.encryptedContent).split("").map(c => c.charCodeAt(0)));
-  const encryptedAesKey = new Uint8Array(window.atob(parsed.encryptedAesKey).split("").map(c => c.charCodeAt(0)));
-  
+  const iv = new Uint8Array(window.atob(parsed.iv).split("").map((c: string) => c.charCodeAt(0)));
+  const encryptedContent = new Uint8Array(window.atob(parsed.encryptedContent).split("").map((c: string) => c.charCodeAt(0)));
+  const candidateKeys: string[] = Array.isArray(parsed.encryptedKeys) && parsed.encryptedKeys.length > 0
+    ? parsed.encryptedKeys
+    : [parsed.encryptedAesKey];
+
   const rsaPrivKey = await importPrivateKey(privateKeyPem);
-  const rawAesKey = await window.crypto.subtle.decrypt(
-    { name: "RSA-OAEP" },
-    rsaPrivKey,
-    encryptedAesKey
-  );
-  
+  let rawAesKey: ArrayBuffer | null = null;
+  for (const encryptedKey of candidateKeys) {
+    if (!encryptedKey) continue;
+    try {
+      const encryptedAesKey = new Uint8Array(window.atob(encryptedKey).split("").map((c: string) => c.charCodeAt(0)));
+      rawAesKey = await window.crypto.subtle.decrypt(
+        { name: "RSA-OAEP" },
+        rsaPrivKey,
+        encryptedAesKey
+      );
+      break;
+    } catch {
+      // Try the next recipient key in the envelope.
+    }
+  }
+
+  if (!rawAesKey) {
+    throw new Error("Message cannot be decrypted by this device key.");
+  }
+
   const aesKey = await window.crypto.subtle.importKey(
     "raw",
     rawAesKey,
@@ -115,15 +170,14 @@ export async function decryptMessage(payload: string, privateKeyPem: string): Pr
     true,
     ["decrypt"]
   );
-  
+
   const decrypted = await window.crypto.subtle.decrypt(
     { name: "AES-GCM", iv },
     aesKey,
     encryptedContent
   );
-  
-  const decoder = new TextDecoder();
-  return decoder.decode(decrypted);
+
+  return new TextDecoder().decode(decrypted);
 }
 
 // --- Group Chat Utilities ---
@@ -168,13 +222,13 @@ export async function encryptGroupMessage(text: string, groupKey: CryptoKey): Pr
   const encoder = new TextEncoder();
   const data = encoder.encode(text);
   const iv = window.crypto.getRandomValues(new Uint8Array(12));
-  
+
   const encryptedContent = await window.crypto.subtle.encrypt(
     { name: "AES-GCM", iv },
     groupKey,
     data
   );
-  
+
   return JSON.stringify({
     iv: window.btoa(String.fromCharCode(...new Uint8Array(iv))),
     encryptedContent: window.btoa(String.fromCharCode(...new Uint8Array(encryptedContent)))
@@ -185,13 +239,12 @@ export async function decryptGroupMessage(payload: string, groupKey: CryptoKey):
   const parsed = JSON.parse(payload);
   const iv = new Uint8Array(window.atob(parsed.iv).split("").map(c => c.charCodeAt(0)));
   const encryptedContent = new Uint8Array(window.atob(parsed.encryptedContent).split("").map(c => c.charCodeAt(0)));
-  
+
   const decrypted = await window.crypto.subtle.decrypt(
     { name: "AES-GCM", iv },
     groupKey,
     encryptedContent
   );
-  
-  const decoder = new TextDecoder();
-  return decoder.decode(decrypted);
+
+  return new TextDecoder().decode(decrypted);
 }

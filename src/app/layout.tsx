@@ -24,6 +24,8 @@ import CommandPalette from "@/components/CommandPalette";
 import VaultSecurityManager from "@/components/VaultSecurityManager";
 import NetworkGuard from "@/components/NetworkGuard";
 import AppEnforcer from "@/components/AppEnforcer";
+import ClientErrorReporter from "@/components/ClientErrorReporter";
+import AppUpdateManager from "@/components/AppUpdateManager";
 
 export default function RootLayout({
   children,
@@ -40,6 +42,8 @@ export default function RootLayout({
               <CookieConsentGate />
               <CommandPalette />
               <VaultSecurityManager />
+              <ClientErrorReporter />
+              <AppUpdateManager />
             </Providers>
           </AppEnforcer>
         </NetworkGuard>

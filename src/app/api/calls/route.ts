@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { getUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { noStoreJson } from "@/lib/security";
+import { createNotification } from "@/lib/notifications";
 export const dynamic = "force-dynamic";
 
 const CALL_STATUSES = new Set(["RINGING", "ONGOING", "ENDED", "MISSED", "REJECTED"]);
@@ -76,13 +77,25 @@ export async function POST(request: NextRequest) {
       return noStoreJson({ error: "Call already active" }, { status: 400 });
     }
 
+    const normalizedMediaType = normalizeMediaType(media_type);
     const call = await prisma.call.create({
       data: {
         conversation_id,
         caller_id: user.id,
-        media_type: normalizeMediaType(media_type),
+        media_type: normalizedMediaType,
         status: "RINGING"
       }
+    });
+
+    const recipientId = conversation.user1_id === user.id ? conversation.user2_id : conversation.user1_id;
+    await createNotification({
+      userId: recipientId,
+      type: "CALL",
+      title: `Incoming ${normalizedMediaType === "AUDIO" ? "audio" : "video"} call`,
+      body: `${user.name || user.email || "Someone"} is calling you`,
+      entityType: "call",
+      entityId: call.id,
+      link: `/chat/call/${call.id}`,
     });
 
     return noStoreJson({ success: true, call });

@@ -5,12 +5,14 @@ import ChatClient from "./ChatClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function ChatPage() {
+export default async function ChatPage({ searchParams }: { searchParams?: Promise<{ conversation?: string; group?: string }> }) {
   const sessionUser = await getUser();
 
   if (!sessionUser) {
     redirect("/login");
   }
+
+  const params = searchParams ? await searchParams : {};
 
   // Fetch direct conversations
   const conversations = await prisma.conversation.findMany({
@@ -69,5 +71,5 @@ export default async function ChatPage() {
     }))
   }));
 
-  return <ChatClient sessionUser={{ id: sessionUser.id }} initialConversations={initialConversations} initialGroups={initialGroups} />;
+  return <ChatClient sessionUser={{ id: sessionUser.id }} initialConversations={initialConversations} initialGroups={initialGroups} initialActiveId={params.group || params.conversation || null} initialActiveType={params.group ? "group" : params.conversation ? "dm" : null} />;
 }

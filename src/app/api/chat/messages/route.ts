@@ -2,8 +2,9 @@ import { NextRequest } from "next/server";
 import { getUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { noStoreJson } from "@/lib/security";
-export const dynamic = "force-dynamic";
+import { createNotification } from "@/lib/notifications";
 
+export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,7 +20,6 @@ export async function GET(request: NextRequest) {
       return noStoreJson({ error: "conversationId is required" }, { status: 400 });
     }
 
-    // Verify user is part of the conversation
     const conversation = await prisma.conversation.findUnique({
       where: { id: conversationId }
     });
@@ -47,13 +47,12 @@ export async function POST(request: NextRequest) {
       return noStoreJson({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { conversation_id, encrypted_content } = await request.json();
+    const { conversation_id, encrypted_content, reply_to_id } = await request.json();
 
     if (!conversation_id || !encrypted_content || typeof encrypted_content !== "string") {
       return noStoreJson({ error: "Invalid payload" }, { status: 400 });
     }
 
-    // Verify user is part of the conversation
     const conversation = await prisma.conversation.findUnique({
       where: { id: conversation_id }
     });
@@ -62,18 +61,36 @@ export async function POST(request: NextRequest) {
       return noStoreJson({ error: "Conversation not found or access denied" }, { status: 404 });
     }
 
+    if (reply_to_id) {
+      const parent = await prisma.message.findUnique({ where: { id: reply_to_id } });
+      if (!parent || parent.conversation_id !== conversation_id) {
+        return noStoreJson({ error: "Invalid reply target" }, { status: 400 });
+      }
+    }
+
+    const recipientId = conversation.user1_id === user.id ? conversation.user2_id : conversation.user1_id;
     const message = await prisma.message.create({
       data: {
         conversation_id,
         sender_id: user.id,
-        encrypted_content
+        encrypted_content,
+        reply_to_id: reply_to_id || null,
       }
     });
 
-    // Update conversation updated_at for sorting
     await prisma.conversation.update({
       where: { id: conversation_id },
       data: { updated_at: new Date() }
+    });
+
+    await createNotification({
+      userId: recipientId,
+      type: "MESSAGE",
+      title: "New direct message",
+      body: `${user.name || user.email || "Someone"} sent you a message`,
+      entityType: "conversation",
+      entityId: conversation_id,
+      link: `/chat?conversation=${conversation_id}`,
     });
 
     return noStoreJson({ success: true, message });
@@ -97,7 +114,6 @@ export async function DELETE(request: NextRequest) {
       return noStoreJson({ error: "Message ID is required" }, { status: 400 });
     }
 
-    // Must verify the user has access to this message's conversation
     const message = await prisma.message.findUnique({
       where: { id },
       include: { conversation: true }

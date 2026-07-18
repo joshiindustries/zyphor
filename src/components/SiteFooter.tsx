@@ -1,4 +1,5 @@
 import Link from "next/link";
+import AppVersionLabel from "@/components/AppVersionLabel";
 
 export default function SiteFooter() {
   const year = new Date().getFullYear();
@@ -24,10 +25,18 @@ export default function SiteFooter() {
           flexWrap: "wrap",
         }}
       >
-        <p style={{ color: "var(--text-secondary)", fontSize: "0.85rem" }}>
-          Copyright (c) {year} J Industries. All rights reserved.
-        </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+          <p style={{ color: "var(--text-secondary)", fontSize: "0.85rem" }}>
+            Copyright (c) {year} J Industries. All rights reserved.
+          </p>
+          <p style={{ color: "var(--text-secondary)", fontSize: "0.78rem" }}>
+            <AppVersionLabel />
+          </p>
+        </div>
         <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
+          <Link href="/install" style={{ color: "var(--accent-blue)", textDecoration: "none", fontSize: "0.85rem" }}>
+            Install / Update
+          </Link>
           <Link href="/policy" style={{ color: "var(--accent-blue)", textDecoration: "none", fontSize: "0.85rem" }}>
             Policy
           </Link>

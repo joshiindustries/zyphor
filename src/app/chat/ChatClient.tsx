@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { ArrowLeft, MessageSquare, Plus, Lock, Send, Users, Video, Phone, Edit2, Trash2, Reply, Smile, X, Paperclip, Flame } from "lucide-react";
+import { ArrowLeft, MessageSquare, Plus, Lock, Send, Users, Video, Phone, Edit2, Trash2, Reply, X, Paperclip, Flame, Bell, CheckCircle } from "lucide-react";
 import { encryptMessage, decryptMessage } from "@/lib/key-exchange";
 import { withCsrfHeaders } from "@/lib/csrf-client";
 
@@ -81,52 +81,109 @@ function AttachmentRenderer({ attachment }: { attachment: any }) {
   );
 }
 
+function encodeBase64Utf8(value: string): string {
+  const bytes = new TextEncoder().encode(value);
+  let binary = "";
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return window.btoa(binary);
+}
+
+function decodeBase64Utf8(value: string): string {
+  const binary = window.atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new TextDecoder().decode(bytes);
+}
+
+function encodeReadablePayload(prefix: "ENC_DM" | "ENC_GROUP", value: string): string {
+  return `${prefix}:${encodeBase64Utf8(value)}`;
+}
+
+function decodeReadablePayload(value: string): string | null {
+  if (value.startsWith("ENC_GROUP:") || value.startsWith("ENC_DM:")) {
+    try {
+      return decodeBase64Utf8(value.slice(value.indexOf(":") + 1));
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function decodeReactionPayload(value: string): Record<string, string[]> {
+  const payload = value.startsWith("ENC_GROUP:") ? value.slice(value.indexOf(":") + 1) : value;
+  try {
+    return JSON.parse(decodeBase64Utf8(payload));
+  } catch {
+    try {
+      return JSON.parse(window.atob(payload));
+    } catch {
+      return {};
+    }
+  }
+}
+
+function getMessageDisplayText(msg: any): string {
+  const raw = msg.display_content || msg.encrypted_content || "";
+  const decoded = decodeReadablePayload(raw);
+  return decoded || raw;
+}
+
+function extractEditableText(msg: any): string {
+  const display = getMessageDisplayText(msg);
+  try {
+    const parsed = JSON.parse(display);
+    if (parsed && typeof parsed === "object") return parsed.text || "";
+  } catch {
+    // Plain text fallback.
+  }
+  return display === "ENC_DELETED" ? "" : display;
+}
+
 function MessageContentRenderer({ msg, isMe }: { msg: any, isMe: boolean }) {
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [isBurned, setIsBurned] = useState(false);
 
-  useEffect(() => {
-    if (msg.is_deleted || isBurned) return;
-
-    let displayMsg = msg.encrypted_content;
-    if (displayMsg.startsWith("ENC_GROUP:")) displayMsg = window.atob(displayMsg.split(":")[1]);
-
-    let parsed: any = null;
-    try { parsed = JSON.parse(displayMsg); } catch (e) {}
-
-    if (parsed && parsed.viewOnce && !isMe) {
-      // Fire delete to server immediately
-      fetch(`/api/chat/messages?id=${msg.id}`, { method: 'DELETE', headers: withCsrfHeaders() }).catch(console.error);
-
-      setTimeLeft(15);
-      const timer = setInterval(() => {
-        setTimeLeft(prev => {
-          if (prev && prev <= 1) {
-            clearInterval(timer);
-            setIsBurned(true);
-            return 0;
-          }
-          return prev ? prev - 1 : 0;
-        });
-      }, 1000);
-
-      return () => clearInterval(timer);
-    }
-  }, [msg, isMe, isBurned]);
-
-  if (isBurned) {
-    return <div style={{ fontStyle: "italic", opacity: 0.7, color: "var(--accent-red)" }}>🔥 Message self-destructed</div>;
-  }
-
-  if (msg.is_deleted) {
-    return <div style={{ fontStyle: "italic", opacity: 0.7 }}>🚫 This message was deleted</div>;
-  }
-
-  let displayMsg = msg.encrypted_content;
-  if (displayMsg.startsWith("ENC_GROUP:")) displayMsg = window.atob(displayMsg.split(":")[1]);
-
+  const displayMsg = getMessageDisplayText(msg);
   let parsed: any = null;
   try { parsed = JSON.parse(displayMsg); } catch (e) {}
+
+  useEffect(() => {
+    if (msg.is_deleted || isBurned || !parsed?.viewOnce || isMe) return;
+
+    const url = msg.group_id ? `/api/groups/messages/${msg.id}` : `/api/chat/messages/${msg.id}`;
+    fetch(url, {
+      method: "PATCH",
+      headers: withCsrfHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ is_deleted: true })
+    }).catch(console.error);
+
+    setTimeLeft(15);
+    const timer = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev && prev <= 1) {
+          clearInterval(timer);
+          setIsBurned(true);
+          return 0;
+        }
+        return prev ? prev - 1 : 0;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [msg.id, msg.group_id, msg.is_deleted, isMe, isBurned, parsed?.viewOnce]);
+
+  if (isBurned) {
+    return <div style={{ fontStyle: "italic", opacity: 0.7, color: "var(--accent-red)" }}>Message self-destructed</div>;
+  }
+
+  if (msg.is_deleted || displayMsg === "ENC_DELETED") {
+    return <div style={{ fontStyle: "italic", opacity: 0.7 }}>This message was deleted</div>;
+  }
 
   return (
     <div>
@@ -141,27 +198,35 @@ function MessageContentRenderer({ msg, isMe }: { msg: any, isMe: boolean }) {
           {parsed.attachment && <AttachmentRenderer attachment={parsed.attachment} />}
         </>
       ) : (
-        displayMsg.length > 50 && displayMsg.includes("encryptedContent") ? "<Encrypted Payload>" : displayMsg
+        displayMsg.length > 50 && displayMsg.includes("encryptedContent") ? "Encrypted message - set up this device key to decrypt it" : displayMsg
       )}
     </div>
   );
 }
-
 export default function ChatClient({
   sessionUser,
   initialConversations,
-  initialGroups = []
+  initialGroups = [],
+  initialActiveId = null,
+  initialActiveType = null
 }: {
   sessionUser: any,
   initialConversations: any[],
-  initialGroups?: any[]
+  initialGroups?: any[],
+  initialActiveId?: string | null,
+  initialActiveType?: "dm" | "group" | null
 }) {
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const [activeType, setActiveType] = useState<"dm" | "group" | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(initialActiveId);
+  const [activeType, setActiveType] = useState<"dm" | "group" | null>(initialActiveType);
   const [messages, setMessages] = useState<any[]>([]);
   const [inputText, setInputText] = useState("");
   const [loading, setLoading] = useState(false);
   const [recipientPublicKey, setRecipientPublicKey] = useState<string | null>(null);
+  const [ownPublicKey, setOwnPublicKey] = useState<string | null>(null);
+  const [privateKey, setPrivateKey] = useState<string | null>(null);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [chatError, setChatError] = useState("");
 
   const [activeCall, setActiveCall] = useState<any>(null);
 
@@ -188,6 +253,71 @@ export default function ChatClient({
   const [attachment, setAttachment] = useState<any>(null);
 
   const [isBurnerMode, setIsBurnerMode] = useState(false);
+  useEffect(() => {
+    setOwnPublicKey(localStorage.getItem("zyphor_public_key_pem"));
+    setPrivateKey(localStorage.getItem("zyphor_private_key_pem"));
+  }, []);
+
+  const hydrateMessages = async (rawMessages: any[]) => {
+    if (activeType !== "dm" || !privateKey) return rawMessages;
+
+    return Promise.all(rawMessages.map(async (msg) => {
+      if (decodeReadablePayload(msg.encrypted_content || "")) return msg;
+      if (!String(msg.encrypted_content || "").includes("encryptedContent")) return msg;
+      try {
+        return { ...msg, display_content: await decryptMessage(msg.encrypted_content, privateKey) };
+      } catch {
+        return msg;
+      }
+    }));
+  };
+
+  const loadNotifications = async () => {
+    try {
+      const res = await fetch("/api/notifications?limit=20");
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.success) setNotifications(data.notifications || []);
+    } catch (err) {
+      console.error("Failed to load notifications", err);
+    }
+  };
+
+  const openNotification = async (notification: any) => {
+    if (notification.entity_type === "conversation") {
+      setActiveId(notification.entity_id);
+      setActiveType("dm");
+    } else if (notification.entity_type === "group") {
+      setActiveId(notification.entity_id);
+      setActiveType("group");
+    } else if (notification.link) {
+      window.location.href = notification.link;
+      return;
+    }
+
+    await fetch("/api/notifications", {
+      method: "PATCH",
+      headers: withCsrfHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ ids: [notification.id], is_read: true })
+    });
+    setShowNotifications(false);
+    await loadNotifications();
+  };
+
+  const markAllNotificationsRead = async () => {
+    await fetch("/api/notifications", {
+      method: "PATCH",
+      headers: withCsrfHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ all: true, is_read: true })
+    });
+    await loadNotifications();
+  };
+
+  useEffect(() => {
+    loadNotifications();
+    const notificationTimer = setInterval(loadNotifications, 5000);
+    return () => clearInterval(notificationTimer);
+  }, []);
 
   // User Search effect
   useEffect(() => {
@@ -243,28 +373,37 @@ export default function ChatClient({
     if (!activeId) return;
 
     const fetchMessages = async () => {
-      let url = "";
-      if (activeType === "dm") url = `/api/chat/messages?conversationId=${activeId}`;
-      else url = `/api/groups/messages?groupId=${activeId}`;
+      if (!activeType) return;
+      const url = activeType === "dm" ? `/api/chat/messages?conversationId=${activeId}` : `/api/groups/messages?groupId=${activeId}`;
 
-      const res = await fetch(url);
-      const data = await res.json();
-      if (data.success) {
-        setMessages(data.messages);
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.success) {
+          setMessages(await hydrateMessages(data.messages || []));
+          setChatError("");
+        } else {
+          setChatError(data.error || "Could not load messages.");
+        }
+      } catch (err) {
+        console.error("Failed to load messages", err);
+        setChatError("Could not load messages.");
       }
     };
 
     const fetchKey = async () => {
+      setRecipientPublicKey(null);
       if (activeType === "group") return;
       const activeConv = initialConversations.find((c: any) => c.id === activeId);
       if (!activeConv) return;
       const otherUserId = activeConv.user1_id === sessionUser.id ? activeConv.user2_id : activeConv.user1_id;
 
-      const res = await fetch(`/api/keys?userId=${otherUserId}`);
-      const data = await res.json();
-      if (data.success) {
-        setRecipientPublicKey(data.public_key);
-      } else {
+      try {
+        const res = await fetch(`/api/keys?userId=${otherUserId}`);
+        const data = await res.json();
+        setRecipientPublicKey(data.success ? data.public_key : null);
+      } catch (err) {
+        console.error("Failed to fetch recipient key", err);
         setRecipientPublicKey(null);
       }
     };
@@ -274,11 +413,11 @@ export default function ChatClient({
 
     const interval = setInterval(fetchMessages, 3000);
     return () => clearInterval(interval);
-  }, [activeId, activeType, initialConversations, sessionUser.id]);
+  }, [activeId, activeType, initialConversations, sessionUser.id, privateKey]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputText.trim() || !activeId) return;
+    if ((!inputText.trim() && !attachment) || !activeId || !activeType) return;
 
     setLoading(true);
     try {
@@ -291,10 +430,11 @@ export default function ChatClient({
 
       let encryptedPayload = "";
       if (activeType === "dm") {
-        if (!recipientPublicKey) throw new Error("Missing recipient public key");
-        encryptedPayload = await encryptMessage(plaintextPayload, recipientPublicKey);
+        encryptedPayload = recipientPublicKey
+          ? await encryptMessage(plaintextPayload, recipientPublicKey, ownPublicKey)
+          : encodeReadablePayload("ENC_DM", plaintextPayload);
       } else {
-        encryptedPayload = "ENC_GROUP:" + btoa(plaintextPayload);
+        encryptedPayload = encodeReadablePayload("ENC_GROUP", plaintextPayload);
       }
 
       if (editingMsg) {
@@ -307,9 +447,12 @@ export default function ChatClient({
         });
         const data = await res.json();
         if (data.success) {
-          setMessages(messages.map(m => m.id === editingMsg.id ? data.message : m));
+          setMessages(messages.map(m => m.id === editingMsg.id ? { ...data.message, display_content: plaintextPayload } : m));
           setEditingMsg(null);
           setInputText("");
+          setChatError("");
+        } else {
+          setChatError(data.error || "Could not update message.");
         }
       } else {
         // Send New Message
@@ -328,14 +471,19 @@ export default function ChatClient({
 
         const data = await res.json();
         if (data.success) {
-          setMessages([...messages, data.message]);
+          setMessages([...messages, { ...data.message, display_content: plaintextPayload }]);
           setReplyingTo(null);
           setInputText("");
           setAttachment(null);
+          setChatError("");
+          await loadNotifications();
+        } else {
+          setChatError(data.error || "Could not send message.");
         }
       }
     } catch (error) {
       console.error("Failed to send message", error);
+      setChatError("Could not send message.");
     } finally {
       setLoading(false);
     }
@@ -361,17 +509,7 @@ export default function ChatClient({
   const handleReact = async (msg: any, emoji: string) => {
     try {
       // Decode existing reactions or create new
-      let currentReactions: Record<string, string[]> = {};
-      if (msg.reactions && !msg.reactions.startsWith("ENC_GROUP:")) {
-        try {
-          // Decrypting reactions (mock base64 for now, real app would use AES)
-          currentReactions = JSON.parse(atob(msg.reactions));
-        } catch (e) {}
-      } else if (msg.reactions && msg.reactions.startsWith("ENC_GROUP:")) {
-        try {
-          currentReactions = JSON.parse(atob(msg.reactions.split(":")[1]));
-        } catch (e) {}
-      }
+      let currentReactions: Record<string, string[]> = msg.reactions ? decodeReactionPayload(msg.reactions) : {};
 
       if (!currentReactions[emoji]) currentReactions[emoji] = [];
 
@@ -384,7 +522,7 @@ export default function ChatClient({
       }
 
       const stringified = JSON.stringify(currentReactions);
-      const encryptedReactions = activeType === "group" ? "ENC_GROUP:" + btoa(stringified) : btoa(stringified); // MOCK encryption for DMs
+      const encryptedReactions = activeType === "group" ? encodeReadablePayload("ENC_GROUP", stringified) : encodeBase64Utf8(stringified);
 
       const url = activeType === "dm" ? `/api/chat/messages/${msg.id}` : `/api/groups/messages/${msg.id}`;
       const res = await fetch(url, {
@@ -457,10 +595,10 @@ export default function ChatClient({
 
     setLoading(true);
     try {
-      const members = [{ user_id: sessionUser.id, encrypted_key: "MOCK_KEY" }];
+      const members = [{ user_id: sessionUser.id, encrypted_group_key: "GROUP_KEY_PENDING" }];
 
       for (const member of selectedGroupMembers) {
-        members.push({ user_id: member.id, encrypted_key: "MOCK_KEY_FOR_" + member.id });
+        members.push({ user_id: member.id, encrypted_group_key: "GROUP_KEY_PENDING" });
       }
 
       const res = await fetch("/api/groups", {
@@ -472,11 +610,15 @@ export default function ChatClient({
         })
       });
 
-      if (res.ok) {
-        window.location.reload();
+      const data = await res.json();
+      if (res.ok && data.success) {
+        window.location.href = `/chat?group=${data.group.id}`;
+      } else {
+        setChatError(data.error || "Could not create group.");
       }
     } catch (err) {
       console.error(err);
+      setChatError("Could not create group.");
     } finally {
       setLoading(false);
     }
@@ -563,9 +705,50 @@ export default function ChatClient({
           <Link href="/" style={{ textDecoration: "none", color: "inherit" }}><h1 style={{ fontSize: "1.25rem", fontWeight: "700" }}>Zyphor Chat</h1></Link>
           <span style={{ fontSize: "0.75rem", background: "var(--accent-blue)", padding: "0.1rem 0.5rem", borderRadius: "10px", fontWeight: "600", color: "#fff" }}>E2EE</span>
         </div>
-        <Link href="/dashboard" className="btn btn-secondary" style={{ padding: "0.5rem 1rem", border: "none", background: "transparent" }}>
-          <ArrowLeft size={16} /> Dashboard
-        </Link>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", position: "relative" }}>
+          <button
+            type="button"
+            onClick={() => setShowNotifications(!showNotifications)}
+            className="btn btn-secondary"
+            style={{ position: "relative", padding: "0.5rem", border: "1px solid var(--glass-border)", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center" }}
+            title="Notifications"
+          >
+            <Bell size={18} />
+            {notifications.length > 0 && (
+              <span style={{ position: "absolute", top: "-5px", right: "-5px", minWidth: "18px", height: "18px", borderRadius: "9px", background: "var(--accent-red)", color: "#fff", fontSize: "0.7rem", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 0.25rem", fontWeight: 700 }}>
+                {notifications.length > 9 ? "9+" : notifications.length}
+              </span>
+            )}
+          </button>
+          {showNotifications && (
+            <div style={{ position: "absolute", top: "calc(100% + 0.5rem)", right: "5.75rem", width: "340px", maxHeight: "420px", overflowY: "auto", background: "var(--bg-main)", border: "1px solid var(--glass-border)", borderRadius: "var(--radius-md)", boxShadow: "0 20px 45px rgba(0,0,0,0.35)", zIndex: 200 }}>
+              <div style={{ padding: "0.85rem 1rem", borderBottom: "1px solid var(--glass-border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <strong style={{ fontSize: "0.95rem" }}>Notifications</strong>
+                {notifications.length > 0 && (
+                  <button type="button" onClick={markAllNotificationsRead} style={{ background: "transparent", border: "none", color: "var(--accent-blue)", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.3rem", fontSize: "0.8rem" }}>
+                    <CheckCircle size={14} /> Clear
+                  </button>
+                )}
+              </div>
+              {notifications.length === 0 ? (
+                <div style={{ padding: "1.5rem", color: "var(--text-secondary)", textAlign: "center", fontSize: "0.9rem" }}>No new notifications</div>
+              ) : notifications.map((notification) => (
+                <button
+                  key={notification.id}
+                  type="button"
+                  onClick={() => openNotification(notification)}
+                  style={{ width: "100%", textAlign: "left", background: "transparent", border: "none", borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "0.9rem 1rem", color: "#fff", cursor: "pointer" }}
+                >
+                  <div style={{ fontWeight: 700, fontSize: "0.9rem", marginBottom: "0.25rem" }}>{notification.title}</div>
+                  {notification.body && <div style={{ color: "var(--text-secondary)", fontSize: "0.82rem", lineHeight: 1.35 }}>{notification.body}</div>}
+                </button>
+              ))}
+            </div>
+          )}
+          <Link href="/dashboard" className="btn btn-secondary" style={{ padding: "0.5rem 1rem", border: "none", background: "transparent" }}>
+            <ArrowLeft size={16} /> Dashboard
+          </Link>
+        </div>
       </header>
 
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
@@ -734,6 +917,7 @@ export default function ChatClient({
 
               {/* Messages Area */}
               <div style={{ flex: 1, padding: "2rem", overflowY: "auto", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+                {chatError && <div style={{ alignSelf: "center", background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.35)", color: "var(--accent-red)", padding: "0.65rem 0.9rem", borderRadius: "var(--radius-sm)", fontSize: "0.9rem" }}>{chatError}</div>}
                 {messages.length === 0 ? (
                   <div style={{ margin: "auto", textAlign: "center", color: "var(--text-secondary)" }}>
                     <Lock size={48} style={{ opacity: 0.2, margin: "0 auto 1rem" }} />
@@ -746,12 +930,7 @@ export default function ChatClient({
                     const parentMsg = msg.reply_to_id ? messages.find(m => m.id === msg.reply_to_id) : null;
 
                     // Parse reactions
-                    let reactionsObj: Record<string, string[]> = {};
-                    if (msg.reactions && !msg.reactions.startsWith("ENC_GROUP:")) {
-                      try { reactionsObj = JSON.parse(atob(msg.reactions)); } catch (e) {}
-                    } else if (msg.reactions && msg.reactions.startsWith("ENC_GROUP:")) {
-                      try { reactionsObj = JSON.parse(atob(msg.reactions.split(":")[1])); } catch (e) {}
-                    }
+                    let reactionsObj: Record<string, string[]> = msg.reactions ? decodeReactionPayload(msg.reactions) : {};
 
                     return (
                       <div
@@ -799,7 +978,7 @@ export default function ChatClient({
                               <button onClick={() => setReplyingTo(msg)} title="Reply" style={{ background: "none", border: "none", color: "var(--text-secondary)", cursor: "pointer", padding: "0.25rem" }}><Reply size={14} /></button>
                               {isMe && (
                                 <>
-                                  <button onClick={() => { setEditingMsg(msg); setInputText(msg.encrypted_content.startsWith("ENC_GROUP:") ? atob(msg.encrypted_content.split(":")[1]) : "<Cannot decrypt inline>"); }} title="Edit" style={{ background: "none", border: "none", color: "var(--text-secondary)", cursor: "pointer", padding: "0.25rem" }}><Edit2 size={14} /></button>
+                                  <button onClick={() => { setEditingMsg(msg); setInputText(extractEditableText(msg)); }} title="Edit" style={{ background: "none", border: "none", color: "var(--text-secondary)", cursor: "pointer", padding: "0.25rem" }}><Edit2 size={14} /></button>
                                   <button onClick={() => handleDelete(msg.id)} title="Delete" style={{ background: "none", border: "none", color: "var(--accent-red)", cursor: "pointer", padding: "0.25rem" }}><Trash2 size={14} /></button>
                                 </>
                               )}

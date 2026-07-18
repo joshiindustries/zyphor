@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Shield, Key, CheckCircle, Loader2, Lock } from "lucide-react";
-import { generateRSAKeyPair, exportPublicKeyToJWK } from "@/lib/crypto";
+import { generateIdentityKeyPair, exportPrivateKey, exportPublicKey } from "@/lib/key-exchange";
+import { withCsrfHeaders } from "@/lib/csrf-client";
 
 export default function SetupKeysPage() {
   const router = useRouter();
@@ -22,28 +23,28 @@ export default function SetupKeysPage() {
       setError(null);
 
       // 1. Generate RSA-OAEP 4096-bit key pair
-      const keyPair = await generateRSAKeyPair();
+      const keyPair = await generateIdentityKeyPair();
 
-      // 2. Export Public Key to JWK
-      const publicKeyJWK = await exportPublicKeyToJWK(keyPair.publicKey);
+      // 2. Export public/private identity keys in PEM form for chat encryption.
+      const publicKeyPem = await exportPublicKey(keyPair.publicKey);
+      const privateKeyPem = await exportPrivateKey(keyPair.privateKey);
 
-      // 3. Save Private Key locally encrypted by Master Password
-      // For demonstration, we simply base64 the password and store it.
-      // In production, use PBKDF2 to derive an AES key and encrypt the private JWK.
+      // 3. Keep the private key on this device only so incoming messages can be decrypted.
       const deviceId = crypto.randomUUID();
       localStorage.setItem("zyphor_device_id", deviceId);
-      sessionStorage.setItem("zyphor_vault_pwd", btoa(masterPassword));
-      localStorage.setItem("zyphor_encrypted_private_key", "ENCRYPTED_WITH_" + btoa(masterPassword));
+      localStorage.setItem("zyphor_public_key_pem", publicKeyPem);
+      localStorage.setItem("zyphor_private_key_pem", privateKeyPem);
+      sessionStorage.setItem("zyphor_vault_pwd", masterPassword);
       
       setStatus("uploading");
 
       // 4. Upload Public Key to Server
       const res = await fetch("/api/keys", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: withCsrfHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
           device_id: deviceId,
-          public_key: JSON.stringify(publicKeyJWK)
+          public_key: publicKeyPem
         })
       });
 

@@ -315,6 +315,21 @@ CREATE TABLE "call_signals" (
 );
 
 -- CreateTable
+CREATE TABLE "notifications" (
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "user_id" UUID NOT NULL,
+    "type" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "body" TEXT,
+    "entity_type" TEXT,
+    "entity_id" TEXT,
+    "link" TEXT,
+    "is_read" BOOLEAN NOT NULL DEFAULT false,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "notifications_pkey" PRIMARY KEY ("id")
+);
+-- CreateTable
 CREATE TABLE "notes" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "user_id" UUID NOT NULL,
@@ -471,6 +486,7 @@ CREATE INDEX "chat_attachments_message_id_idx" ON "chat_attachments"("message_id
 CREATE INDEX "chat_attachments_group_message_id_idx" ON "chat_attachments"("group_message_id");
 CREATE INDEX "cloud_connections_user_id_provider_idx" ON "cloud_connections"("user_id", "provider");
 CREATE INDEX "call_signals_call_id_created_at_idx" ON "call_signals"("call_id", "created_at");
+CREATE INDEX "notifications_user_id_is_read_created_at_idx" ON "notifications"("user_id", "is_read", "created_at");
 CREATE UNIQUE INDEX "note_shares_note_id_shared_with_user_id_key" ON "note_shares"("note_id", "shared_with_user_id");
 CREATE UNIQUE INDEX "trusted_devices_device_id_key" ON "trusted_devices"("device_id");
 
@@ -506,6 +522,7 @@ ALTER TABLE "calls" ADD CONSTRAINT "calls_conversation_id_fkey" FOREIGN KEY ("co
 ALTER TABLE "calls" ADD CONSTRAINT "calls_caller_id_fkey" FOREIGN KEY ("caller_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "call_signals" ADD CONSTRAINT "call_signals_call_id_fkey" FOREIGN KEY ("call_id") REFERENCES "calls"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "call_signals" ADD CONSTRAINT "call_signals_sender_id_fkey" FOREIGN KEY ("sender_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "notifications" ADD CONSTRAINT "notifications_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "notes" ADD CONSTRAINT "notes_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "note_shares" ADD CONSTRAINT "note_shares_note_id_fkey" FOREIGN KEY ("note_id") REFERENCES "notes"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "note_shares" ADD CONSTRAINT "note_shares_shared_with_user_id_fkey" FOREIGN KEY ("shared_with_user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;

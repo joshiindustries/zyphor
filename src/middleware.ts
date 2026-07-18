@@ -16,6 +16,9 @@ const CSRF_PROTECTED_PREFIXES = [
   "/api/notes",
   "/api/chat",
   "/api/cloud-connections",
+  "/api/notifications",
+  "/api/error-report",
+  "/api/keys",
 ];
 
 function isCsrfProtectedPath(pathname: string): boolean {

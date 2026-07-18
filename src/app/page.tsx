@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Lock, Shield, Zap, UploadCloud, CheckCircle2, Copy, Share2, Mail, MessageCircle, Send } from "lucide-react";
+import { Lock, Shield, Zap, UploadCloud, CheckCircle2, Copy, Share2, Mail, MessageCircle, Send, DownloadCloud } from "lucide-react";
 import { encryptFile } from "@/lib/crypto";
 import { generateMemorablePassphrase } from "@/lib/words";
 import { withCsrfHeaders } from "@/lib/csrf-client";
@@ -441,7 +441,8 @@ export default function Home() {
           <img src="/logo.png" alt="Zyphor Logo" style={{ height: "32px", width: "auto" }} />
           <h1 style={{ fontSize: "1.25rem", fontWeight: "700", letterSpacing: "-0.5px" }}>Zyphor</h1>
         </div>
-        <nav style={{ display: "flex", gap: "1rem" }}>
+        <nav style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", justifyContent: "center" }}>
+          <Link href="/install" className="btn btn-secondary" style={{ border: "1px solid var(--glass-border)" }}><DownloadCloud size={16} /> Install / Update</Link>
           {!isLoadingAuth && user ? (
             <Link href="/dashboard" className="btn btn-primary">Go to Vault</Link>
           ) : !isLoadingAuth ? (
