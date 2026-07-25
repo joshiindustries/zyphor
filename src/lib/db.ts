@@ -10,7 +10,7 @@ function readDatabaseUrlFromDotEnv(): string | null {
     const envPath = path.join(process.cwd(), ".env");
     if (!fs.existsSync(envPath)) return null;
 
-    const envContent = fs.readFileSync(envPath, "utf8");
+    const envContent = fs.readFileSync(envPath, "utf8").replace(/\0/g, "");
     for (const line of envContent.split(/\r?\n/)) {
       const trimmed = line.trim();
       if (!trimmed || trimmed.startsWith("#")) continue;
@@ -99,6 +99,15 @@ function normalizeConnectionStringForPg(
   }
 }
 
+function getPoolMax(): number {
+  const configured = Number(process.env.DATABASE_POOL_MAX || process.env.PGPOOL_MAX);
+  if (Number.isFinite(configured) && configured > 0) return Math.min(Math.floor(configured), 10);
+
+  // Vercel/Supabase session pooler has a small global session cap. Keep each
+  // function instance tiny so polling endpoints cannot consume the whole pool.
+  return process.env.NODE_ENV === "production" ? 1 : 5;
+}
+
 function createPrismaClient() {
   const connectionString = getConnectionString();
   const disableTlsVerification = shouldDisableTlsVerification(connectionString);
@@ -109,6 +118,10 @@ function createPrismaClient() {
 
   const adapter = new PrismaPg({
     connectionString: normalizedConnectionString,
+    max: getPoolMax(),
+    idleTimeoutMillis: Number(process.env.DATABASE_POOL_IDLE_TIMEOUT_MS || 5000),
+    connectionTimeoutMillis: Number(process.env.DATABASE_POOL_CONNECT_TIMEOUT_MS || 5000),
+    allowExitOnIdle: true,
     ...(disableTlsVerification ? { ssl: { rejectUnauthorized: false } } : {}),
   });
 
@@ -128,15 +141,12 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 export const prisma = globalForPrisma.prisma ?? createPrismaClient();
+globalForPrisma.prisma = prisma;
 
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma;
-
-  if (!globalForPrisma.prismaHostLogged) {
-    const dotEnvValue = readDatabaseUrlFromDotEnv() || "";
-    const envValue = process.env.DATABASE_URL?.trim() || "";
-    const chosen = dotEnvValue || envValue;
-    console.warn(`[db] Active Prisma target=${getSafeTarget(chosen)} source=${dotEnvValue ? ".env" : "process.env"}`);
-    globalForPrisma.prismaHostLogged = true;
-  }
+if (process.env.NODE_ENV !== 'production' && !globalForPrisma.prismaHostLogged) {
+  const dotEnvValue = readDatabaseUrlFromDotEnv() || "";
+  const envValue = process.env.DATABASE_URL?.trim() || "";
+  const chosen = dotEnvValue || envValue;
+  console.warn(`[db] Active Prisma target=${getSafeTarget(chosen)} source=${dotEnvValue ? ".env" : "process.env"}`);
+  globalForPrisma.prismaHostLogged = true;
 }
