@@ -16,6 +16,13 @@ type LiveEvent = {
   call?: any;
 };
 
+type BrowserNotificationOptions = NotificationOptions & {
+  badge?: string;
+  data?: unknown;
+  renotify?: boolean;
+  requireInteraction?: boolean;
+};
+
 const SEEN_KEY = "zyphor_seen_live_notifications";
 const MAX_SEEN = 160;
 
@@ -34,7 +41,7 @@ function writeSeen(seen: Set<string>) {
 async function showBrowserNotification(event: LiveEvent) {
   if (!("Notification" in window) || Notification.permission !== "granted") return;
 
-  const options: NotificationOptions = {
+  const options: BrowserNotificationOptions = {
     body: event.body,
     icon: "/logo.png",
     badge: "/logo.png",
