@@ -273,33 +273,23 @@ export const authOptions: AuthOptions = {
       if (user) {
         token.id = user.id;
         token.email = user.email;
+        token.name = user.name;
+        token.picture = user.image;
       }
       if (trigger === "update" && session?.name) {
         token.name = session.name;
-        // Optionally update other fields if needed
+      }
+      if (trigger === "update" && session?.image) {
+        token.picture = session.image;
       }
       return token;
     },
     async session({ session, token }: any) {
       if (token && session.user) {
         session.user.id = token.id as string;
-      }
-
-      // Refresh user data from DB to get the latest
-      if (session.user?.email) {
-        try {
-          const dbUser = await prisma.user.findUnique({
-            where: { email: normalizeEmail(session.user.email) }
-          });
-          if (dbUser) {
-            session.user.id = dbUser.id;
-            session.user.name = dbUser.name;
-            session.user.image = dbUser.avatar;
-            (session.user as any).dob = (dbUser as any).dob;
-          }
-        } catch (error) {
-          console.error("Session callback DB lookup failed:", error);
-        }
+        session.user.email = (token.email as string) || session.user.email;
+        session.user.name = (token.name as string) || session.user.name;
+        session.user.image = (token.picture as string) || session.user.image;
       }
       return session;
     }
@@ -383,9 +373,9 @@ async function verifyDeviceAndReturn(user: any, fingerprintHash: string) {
     });
 
     console.log(`\n\n========================================`);
-    console.log(`🔒 NEW DEVICE LOGIN DETECTED`);
-    console.log(`📧 To: ${user.email}`);
-    console.log(`🔑 OTP: ${otp}`);
+    console.log(`ðŸ”’ NEW DEVICE LOGIN DETECTED`);
+    console.log(`ðŸ“§ To: ${user.email}`);
+    console.log(`ðŸ”‘ OTP: ${otp}`);
     console.log(`========================================\n\n`);
 
     // Send the actual email

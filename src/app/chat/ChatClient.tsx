@@ -68,7 +68,7 @@ function AttachmentRenderer({ attachment }: { attachment: any }) {
   return (
     <div style={{ padding: "0.75rem", background: "rgba(0,0,0,0.2)", borderRadius: "8px", marginTop: "0.5rem", display: "flex", alignItems: "center", gap: "1rem" }}>
       <div style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "0.85rem" }}>
-        📎 {attachment.name}
+        ðŸ“Ž {attachment.name}
       </div>
       {decryptedUrl ? (
         <a href={decryptedUrl} download={attachment.name} className="btn btn-secondary" style={{ padding: "0.25rem 0.5rem", fontSize: "0.8rem", textDecoration: "none", color: "#fff", border: "1px solid var(--glass-border)" }}>Download</a>
@@ -306,10 +306,8 @@ export default function ChatClient({
   };
 
   useEffect(() => {
-    loadNotifications();
-    const notificationTimer = setInterval(loadNotifications, 5000);
-    return () => clearInterval(notificationTimer);
-  }, []);
+    if (showNotifications) loadNotifications();
+  }, [showNotifications]);
 
   // User Search effect
   useEffect(() => {
@@ -733,7 +731,7 @@ export default function ChatClient({
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "0.25rem", marginBottom: "0.5rem", marginTop: "0.5rem" }}>
                   {selectedGroupMembers.map(u => (
                     <span key={u.id} style={{ fontSize: "0.75rem", background: "var(--accent-purple)", padding: "0.2rem 0.5rem", borderRadius: "10px", display: "flex", alignItems: "center", gap: "0.25rem" }}>
-                      {u.name} <button style={{ background: "none", border: "none", color: "#fff", cursor: "pointer", padding: 0 }} onClick={() => setSelectedGroupMembers(selectedGroupMembers.filter(m => m.id !== u.id))}>×</button>
+                      {u.name} <button style={{ background: "none", border: "none", color: "#fff", cursor: "pointer", padding: 0 }} onClick={() => setSelectedGroupMembers(selectedGroupMembers.filter(m => m.id !== u.id))}>Ã—</button>
                     </span>
                   ))}
                 </div>
@@ -912,8 +910,8 @@ export default function ChatClient({
                           {/* Hover Context Menu */}
                           {hoveredMsgId === msg.id && !msg.is_deleted && (
                             <div style={{ display: "flex", gap: "0.25rem", background: "var(--glass-bg)", padding: "0.25rem", borderRadius: "var(--radius-sm)", border: "1px solid var(--glass-border)" }}>
-                              <button onClick={() => handleReact(msg, "👍")} title="React 👍" style={{ background: "none", border: "none", color: "var(--text-secondary)", cursor: "pointer", padding: "0.25rem" }}>👍</button>
-                              <button onClick={() => handleReact(msg, "❤️")} title="React ❤️" style={{ background: "none", border: "none", color: "var(--text-secondary)", cursor: "pointer", padding: "0.25rem" }}>❤️</button>
+                              <button onClick={() => handleReact(msg, "ðŸ‘")} title="React ðŸ‘" style={{ background: "none", border: "none", color: "var(--text-secondary)", cursor: "pointer", padding: "0.25rem" }}>ðŸ‘</button>
+                              <button onClick={() => handleReact(msg, "â¤ï¸")} title="React â¤ï¸" style={{ background: "none", border: "none", color: "var(--text-secondary)", cursor: "pointer", padding: "0.25rem" }}>â¤ï¸</button>
                               <button onClick={() => setReplyingTo(msg)} title="Reply" style={{ background: "none", border: "none", color: "var(--text-secondary)", cursor: "pointer", padding: "0.25rem" }}><Reply size={14} /></button>
                               {isMe && (
                                 <>

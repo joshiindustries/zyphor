@@ -25,6 +25,9 @@ type BrowserNotificationOptions = NotificationOptions & {
 
 const SEEN_KEY = "zyphor_seen_live_notifications";
 const MAX_SEEN = 160;
+const BASE_POLL_MS = 8000;
+const DEGRADED_POLL_MS = 30000;
+const HIDDEN_POLL_MS = 45000;
 
 function readSeen(): Set<string> {
   try {
@@ -75,6 +78,7 @@ export default function LiveNotificationCenter() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const lastPollRef = useRef(Date.now());
   const initializedRef = useRef(false);
+  const failureCountRef = useRef(0);
 
   useEffect(() => {
     if ("Notification" in window) setPermission(Notification.permission);
@@ -93,17 +97,26 @@ export default function LiveNotificationCenter() {
   const pollLiveEvents = useCallback(async () => {
     try {
       const since = initializedRef.current ? lastPollRef.current : Date.now() - 5000;
-      const res = await fetch(`/api/notifications/live?since=${since}&lookbackSeconds=10&limit=30`, { cache: "no-store" });
+      const res = await fetch(`/api/notifications/live?since=${since}&lookbackSeconds=20&limit=12`, { cache: "no-store" });
       if (res.status === 401) {
+        failureCountRef.current = 0;
         setIsAuthenticated(false);
         setActiveCall(null);
         return;
       }
-      if (!res.ok) return;
+      if (!res.ok) {
+        failureCountRef.current = Math.min(failureCountRef.current + 1, 3);
+        return;
+      }
 
       const data = await res.json();
-      if (!data.success) return;
+      if (!data.success) {
+        failureCountRef.current = Math.min(failureCountRef.current + 1, 3);
+        return;
+      }
+
       setIsAuthenticated(true);
+      failureCountRef.current = data.degraded ? Math.min(failureCountRef.current + 1, 3) : 0;
 
       const liveEvents = data.events || [];
       const incomingCall = liveEvents.find((event: LiveEvent) => event.kind === "CALL") || null;
@@ -129,14 +142,33 @@ export default function LiveNotificationCenter() {
       initializedRef.current = true;
       lastPollRef.current = data.serverTime || Date.now();
     } catch (error) {
+      failureCountRef.current = Math.min(failureCountRef.current + 1, 3);
       console.error("Live notification polling failed", error);
     }
   }, []);
 
   useEffect(() => {
-    pollLiveEvents();
-    const timer = window.setInterval(pollLiveEvents, 3000);
-    return () => window.clearInterval(timer);
+    let stopped = false;
+    let timer: number | undefined;
+
+    const schedule = () => {
+      if (stopped) return;
+      const isHidden = document.visibilityState !== "visible";
+      const delay = isHidden ? HIDDEN_POLL_MS : failureCountRef.current > 0 ? DEGRADED_POLL_MS : BASE_POLL_MS;
+      timer = window.setTimeout(run, delay);
+    };
+
+    const run = async () => {
+      await pollLiveEvents();
+      schedule();
+    };
+
+    void run();
+
+    return () => {
+      stopped = true;
+      if (timer) window.clearTimeout(timer);
+    };
   }, [pollLiveEvents]);
 
   const updateCall = async (status: "ONGOING" | "REJECTED") => {
