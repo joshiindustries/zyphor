@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { RefreshCw, X } from "lucide-react";
 
 const INSTALLED_RELEASE_KEY = "zyphor_installed_release";
@@ -110,9 +109,6 @@ export default function AppUpdateManager() {
         <button type="button" className="btn btn-primary" onClick={async () => { setUpdating(true); await refreshApp(versionInfo.releaseId); }} disabled={updating} style={{ flex: "1 1 150px" }}>
           <RefreshCw size={16} /> {updating ? "Updating..." : "Update now"}
         </button>
-        <Link href="/install" className="btn btn-secondary" style={{ flex: "1 1 120px", textDecoration: "none", border: "1px solid var(--glass-border)" }}>
-          Details
-        </Link>
       </div>
     </div>
   );

@@ -34,9 +34,6 @@ export default function SiteFooter() {
           </p>
         </div>
         <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
-          <Link href="/install" style={{ color: "var(--accent-blue)", textDecoration: "none", fontSize: "0.85rem" }}>
-            Install / Update
-          </Link>
           <Link href="/policy" style={{ color: "var(--accent-blue)", textDecoration: "none", fontSize: "0.85rem" }}>
             Policy
           </Link>

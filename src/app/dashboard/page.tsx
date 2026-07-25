@@ -6,37 +6,18 @@ import LogoutButton from "@/components/LogoutButton";
 import UserAvatar from "@/components/UserAvatar";
 import SiteFooter from "@/components/SiteFooter";
 import DashboardSections from "./DashboardSections";
+import { passwordEntriesAfterResetWhere } from "@/lib/password-reset";
 
 export const dynamic = "force-dynamic";
 
-type DashboardLinkBase = {
-  id: string;
-  current_downloads: number;
-  max_downloads: number;
-  created_at: Date | string;
-  expires_at: Date | string;
-  allow_save: number;
-  auth_required: number;
-  [key: string]: unknown;
-};
-
-type DashboardLinkWithCount = DashboardLinkBase & {
-  _count: {
-    saved_by: number;
-  };
-};
-
-type DashboardLink = DashboardLinkBase & {
-  save_count: number;
-};
-
-type SavedLinkRow = {
-  link: DashboardLinkBase;
-  saved_at: Date | string;
-};
-
-type SavedDashboardLink = DashboardLinkBase & {
-  saved_at: Date | string;
+type DashboardStats = {
+  notes: number;
+  taskBoards: number;
+  calendars: number;
+  passwords: number;
+  deviceKeys: number;
+  passkeys: number;
+  trustedDevices: number;
 };
 
 export default async function DashboardPage() {
@@ -64,55 +45,44 @@ export default async function DashboardPage() {
     avatar: dbUser?.avatar || user.image || null,
   };
 
-  // Fetch user links with save count
-  const linksRaw = await prisma.link.findMany({
-    where: { user_id: user.id },
-    orderBy: { created_at: 'desc' },
-    include: {
-      _count: {
-        select: { saved_by: true }
-      }
-    }
-  }) as DashboardLinkWithCount[];
-    
-  const links: DashboardLink[] = linksRaw.map((link: DashboardLinkWithCount) => {
-    const { _count, ...rest } = link;
-    return {
-      ...rest,
-      save_count: _count.saved_by
-    };
-  });
+  const [notes, taskBoards, calendars, passwords, deviceKeys, passkeys, trustedDevices] = await Promise.all([
+    prisma.note.count({ where: { user_id: user.id } }),
+    prisma.taskBoard.count({ where: { user_id: user.id } }),
+    prisma.eventCalendar.count({ where: { user_id: user.id } }),
+    prisma.passwordEntry.count({ where: { user_id: user.id, ...passwordEntriesAfterResetWhere() } }),
+    prisma.userKey.count({ where: { user_id: user.id } }),
+    prisma.passkeyCredential.count({ where: { user_id: user.id } }),
+    prisma.trustedDevice.count({ where: { user_id: user.id, trusted: true } }),
+  ]);
 
-  // Fetch saved links
-  const savedLinksRaw = await prisma.savedLink.findMany({
-    where: { user_id: user.id },
-    orderBy: { saved_at: 'desc' },
-    include: { link: true }
-  }) as SavedLinkRow[];
-  
-  const savedLinks: SavedDashboardLink[] = savedLinksRaw.map((saved: SavedLinkRow) => ({
-    ...saved.link,
-    saved_at: saved.saved_at
-  }));
+  const stats: DashboardStats = {
+    notes,
+    taskBoards,
+    calendars,
+    passwords,
+    deviceKeys,
+    passkeys,
+    trustedDevices,
+  };
 
   return (
     <main style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-      <header className="main-header" style={{ borderBottom: "1px solid var(--glass-border)", background: "var(--glass-bg)" }}>
+      <header className="main-header" style={{ borderBottom: "1px solid var(--glass-border)", background: "var(--glass-bg)", gap: "1rem", flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
           <img src="/logo.png" alt="Zyphor Logo" style={{ height: "32px", width: "auto" }} />
-          <Link href="/" style={{ textDecoration: "none", color: "inherit" }}><h1 style={{ fontSize: "1.25rem", fontWeight: "700" }}>Zyphor</h1></Link>
+          <Link href="/dashboard" style={{ textDecoration: "none", color: "inherit" }}><h1 style={{ fontSize: "1.25rem", fontWeight: "700" }}>Zyphor Cloud</h1></Link>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-          <Link href="/profile" className="btn btn-secondary" style={{ padding: "0.5rem 1rem", border: "none", background: "transparent", display: "flex", alignItems: "center", gap: "0.75rem" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap", justifyContent: "center" }}>
+          <Link href="/profile" className="btn btn-secondary" style={{ padding: "0.5rem 0.85rem", border: "1px solid var(--glass-border)", background: "transparent", display: "flex", alignItems: "center", gap: "0.6rem", textDecoration: "none" }}>
             <UserAvatar user={profileUser} />
-            <span style={{ color: "var(--text-primary)", fontWeight: "600" }}>My Profile</span>
+            <span style={{ color: "var(--text-primary)", fontWeight: "600" }}>Profile</span>
           </Link>
           <LogoutButton />
         </div>
       </header>
 
-      <div style={{ flex: 1, padding: "clamp(1rem, 4vw, 2rem)", maxWidth: "1200px", margin: "0 auto", width: "100%" }}>
-        <DashboardSections links={links} savedLinks={savedLinks} />
+      <div style={{ flex: 1, padding: "clamp(1rem, 4vw, 2rem)", maxWidth: "1280px", margin: "0 auto", width: "100%" }}>
+        <DashboardSections userName={profileUser.name || profileUser.email || "there"} stats={stats} />
       </div>
       <SiteFooter />
     </main>

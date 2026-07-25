@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
       return noStoreJson({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { group_id, encrypted_content, reply_to_id } = await request.json();
+    const { group_id, encrypted_content, reply_to_id, burn_after_view } = await request.json();
 
     if (!group_id || !encrypted_content || typeof encrypted_content !== "string") {
       return noStoreJson({ error: "Invalid payload" }, { status: 400 });
@@ -75,6 +75,7 @@ export async function POST(request: NextRequest) {
         sender_id: user.id,
         encrypted_content,
         reply_to_id: reply_to_id || null,
+        burn_after_view: Boolean(burn_after_view),
       }
     });
 

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Key, Plus, Search, ShieldAlert, Copy, CheckCircle, Lock, RefreshCw, AlertTriangle, Eye, EyeOff, Trash2 } from "lucide-react";
 import { deriveKey, encryptTextWithAES, decryptTextWithAES } from "@/lib/crypto";
 import TOTPDisplay from "@/components/TOTPDisplay";
+import { withCsrfHeaders } from "@/lib/csrf-client";
 
 export default function PasswordsDashboard() {
   const [masterPassword, setMasterPassword] = useState("");
@@ -117,7 +118,7 @@ export default function PasswordsDashboard() {
 
       const res = await fetch("/api/passwords", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: withCsrfHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ encrypted_data: encryptedData })
       });
 
@@ -137,8 +138,17 @@ export default function PasswordsDashboard() {
     if (!masterKey) return;
     if (!confirm("Delete this password?")) return;
     
-    await fetch(`/api/passwords/${id}`, { method: "DELETE" });
+    await fetch(`/api/passwords/${id}`, { method: "DELETE", headers: withCsrfHeaders() });
     await loadPasswords(masterKey);
+  };
+
+  const handleResetAll = async () => {
+    if (!masterKey) return;
+    if (!confirm("Clear all saved password-manager entries for this account? Your login password will not be changed.")) return;
+
+    await fetch("/api/passwords", { method: "DELETE", headers: withCsrfHeaders() });
+    setPasswords([]);
+    calculateHealth([]);
   };
 
   const copyToClipboard = (text: string) => {
@@ -198,9 +208,14 @@ export default function PasswordsDashboard() {
             End-to-End Encrypted. Zero-Knowledge.
           </p>
         </div>
-        <button className="btn btn-primary" onClick={() => setIsAdding(true)} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <Plus size={18} /> Add Password
-        </button>
+        <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", justifyContent: "flex-end" }}>
+          <button className="btn btn-secondary" onClick={handleResetAll} style={{ display: "flex", alignItems: "center", gap: "0.5rem", border: "1px solid rgba(239, 68, 68, 0.3)", color: "var(--accent-red)" }}>
+            <Trash2 size={18} /> Clear All
+          </button>
+          <button className="btn btn-primary" onClick={() => setIsAdding(true)} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <Plus size={18} /> Add Password
+          </button>
+        </div>
       </header>
 
       {/* Health Stats */}

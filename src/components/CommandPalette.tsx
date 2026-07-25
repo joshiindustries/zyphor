@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Search, FileText, CheckSquare, Calendar as CalendarIcon, 
-  MessageSquare, Video, Shield, Key, Folder, Home, Settings,
+  MessageSquare, Video, Shield, Key, Home, Settings,
   ArrowRight, Loader2
 } from 'lucide-react';
 import { VaultPasswordModal, requireVaultPassword } from '@/lib/vault-password';
@@ -37,7 +37,6 @@ export default function CommandPalette() {
   const baseCommands: CommandItem[] = [
     // Navigation
     { id: 'nav-home', title: 'Go to Dashboard', category: 'Navigation', icon: <Home size={16} />, action: () => router.push('/dashboard') },
-    { id: 'nav-vault', title: 'Cloud Vault', category: 'Navigation', icon: <Folder size={16} />, action: () => router.push('/dashboard/vault') },
     { id: 'nav-notes', title: 'Secure Notes', category: 'Navigation', icon: <FileText size={16} />, action: () => router.push('/dashboard/notes') },
     { id: 'nav-tasks', title: 'Kanban Tasks', category: 'Navigation', icon: <CheckSquare size={16} />, action: () => router.push('/dashboard/tasks') },
     { id: 'nav-calendar', title: 'Calendar', category: 'Navigation', icon: <CalendarIcon size={16} />, action: () => router.push('/dashboard/calendar') },

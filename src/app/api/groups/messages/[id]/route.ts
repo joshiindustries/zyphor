@@ -13,7 +13,7 @@ export async function PATCH(
     if (!user) return noStoreJson({ error: "Unauthorized" }, { status: 401 });
 
     const messageId = params.id;
-    const { encrypted_content, is_deleted, reactions } = await request.json();
+    const { encrypted_content, is_deleted, reactions, burn_after_view } = await request.json();
 
     const message = await prisma.groupMessage.findUnique({
       where: { id: messageId },
@@ -22,7 +22,6 @@ export async function PATCH(
 
     if (!message) return noStoreJson({ error: "Message not found" }, { status: 404 });
 
-    // Verify user is in the group
     const isMember = message.group.members.some(m => m.user_id === user.id);
     if (!isMember) {
       return noStoreJson({ error: "Forbidden" }, { status: 403 });
@@ -31,9 +30,15 @@ export async function PATCH(
     const updates: any = {};
 
     if (is_deleted !== undefined) {
-      if (message.sender_id !== user.id) return noStoreJson({ error: "Forbidden" }, { status: 403 });
-      updates.is_deleted = is_deleted;
-      updates.encrypted_content = "ENC_DELETED"; // Tombstone
+      const isBurnerDelete = is_deleted === true && message.burn_after_view === true && burn_after_view === true;
+      if (message.sender_id !== user.id && !isBurnerDelete) {
+        return noStoreJson({ error: "Forbidden" }, { status: 403 });
+      }
+      updates.is_deleted = Boolean(is_deleted);
+      if (is_deleted) {
+        updates.encrypted_content = "ENC_DELETED";
+        updates.burned_at = new Date();
+      }
     }
 
     if (encrypted_content !== undefined && is_deleted === undefined) {
@@ -43,7 +48,6 @@ export async function PATCH(
     }
 
     if (reactions !== undefined) {
-      // Anyone in group can react
       updates.reactions = reactions;
     }
 

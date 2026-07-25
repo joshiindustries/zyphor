@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Turnstile } from "@marsidev/react-turnstile";
+import { Fingerprint } from "lucide-react";
 
 const TURNSTILE_FLAG = process.env.NEXT_PUBLIC_TURNSTILE_ENABLED?.toLowerCase();
 const TURNSTILE_ENABLED =
@@ -21,6 +22,7 @@ function LoginPageContent() {
   const [showOtp, setShowOtp] = useState(false);
   const [otp, setOtp] = useState("");
   const [trustDevice, setTrustDevice] = useState(true);
+  const [passkeyNotice, setPasskeyNotice] = useState("");
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -54,6 +56,18 @@ function LoginPageContent() {
     return Math.abs(hash).toString(16);
   };
 
+
+  const handlePasskeyNotice = async () => {
+    setPasskeyNotice("");
+    setError("");
+
+    if (!("credentials" in navigator) || !window.PublicKeyCredential) {
+      setPasskeyNotice("This browser does not support passkeys. Use password login and add a PIN unlock instead.");
+      return;
+    }
+
+    setPasskeyNotice("Passkey records are saved after you sign in and open Keys & Passkeys. Passwordless login will activate once a verified passkey is registered for this account.");
+  };
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -147,6 +161,7 @@ function LoginPageContent() {
         <p style={{ color: "var(--text-secondary)", marginBottom: "2rem", textAlign: "center" }}>Log in to access your dashboard</p>
 
         {error && <div style={{ color: "#ff4444", marginBottom: "1rem", fontSize: "0.9rem", background: "rgba(255, 0, 0, 0.1)", padding: "0.75rem", borderRadius: "var(--radius-sm)" }}>{error}</div>}
+        {passkeyNotice && <div style={{ color: "var(--accent-blue)", marginBottom: "1rem", fontSize: "0.9rem", background: "rgba(59, 130, 246, 0.1)", padding: "0.75rem", borderRadius: "var(--radius-sm)", lineHeight: 1.45 }}>{passkeyNotice}</div>}
 
         {showOtp ? (
           <form onSubmit={handleVerifyOtp} style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
@@ -217,6 +232,9 @@ function LoginPageContent() {
                 Turnstile disabled for local development.
               </div>
             )}
+            <button type="button" onClick={handlePasskeyNotice} className="btn btn-secondary" style={{ width: "100%", padding: "0.9rem", border: "1px solid var(--glass-border)" }}>
+              <Fingerprint size={18} /> Continue with Passkey
+            </button>
             <button type="submit" className="btn btn-primary" disabled={loading || (TURNSTILE_ENABLED && !turnstileToken)} style={{ width: "100%", padding: "1rem" }}>
               {loading ? "Loading, please wait..." : "Log In"}
             </button>

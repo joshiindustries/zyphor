@@ -5,8 +5,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Zyphor | E2E Encrypted Transfers",
-  description: "Securely share files with end-to-end encryption. No size limits, completely private.",
+  title: "Zyphor Cloud | One Platform. Every Cloud. Complete Control.",
+  description: "Connect, secure, manage, and share cloud storage from one encrypted dashboard.",
   manifest: "/manifest.json",
 };
 
@@ -26,6 +26,7 @@ import NetworkGuard from "@/components/NetworkGuard";
 import AppEnforcer from "@/components/AppEnforcer";
 import ClientErrorReporter from "@/components/ClientErrorReporter";
 import AppUpdateManager from "@/components/AppUpdateManager";
+import LiveNotificationCenter from "@/components/LiveNotificationCenter";
 
 export default function RootLayout({
   children,
@@ -43,6 +44,7 @@ export default function RootLayout({
               <CommandPalette />
               <VaultSecurityManager />
               <ClientErrorReporter />
+              <LiveNotificationCenter />
               <AppUpdateManager />
             </Providers>
           </AppEnforcer>

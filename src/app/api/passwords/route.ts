@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { getUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { passwordEntriesAfterResetWhere } from "@/lib/password-reset";
 import { noStoreJson } from "@/lib/security";
 
 export const dynamic = "force-dynamic";
@@ -13,8 +14,8 @@ export async function GET(request: NextRequest) {
     }
 
     const passwords = await prisma.passwordEntry.findMany({
-      where: { user_id: user.id },
-      orderBy: { updated_at: 'desc' }
+      where: { user_id: user.id, ...passwordEntriesAfterResetWhere() },
+      orderBy: { updated_at: "desc" }
     });
 
     return noStoreJson({ success: true, passwords });
@@ -46,6 +47,21 @@ export async function POST(request: NextRequest) {
     return noStoreJson({ success: true, password });
   } catch (error) {
     console.error("Error creating password:", error);
+    return noStoreJson({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+export async function DELETE() {
+  try {
+    const user = await getUser();
+    if (!user) {
+      return noStoreJson({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    await prisma.passwordEntry.deleteMany({ where: { user_id: user.id } });
+    return noStoreJson({ success: true });
+  } catch (error) {
+    console.error("Error clearing passwords:", error);
     return noStoreJson({ error: "Internal server error" }, { status: 500 });
   }
 }

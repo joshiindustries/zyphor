@@ -31,6 +31,8 @@ model User {
   sessions       Session[] // Custom session table
   download_logs  DownloadLog[]
   keys           UserKey[]
+  unlock_credentials UnlockCredential[]
+  passkeys       PasskeyCredential[]
   sent_messages  Message[] @relation("SentMessages")
   conversations_started Conversation[] @relation("ConversationsStarted")
   conversations_joined  Conversation[] @relation("ConversationsJoined")
@@ -176,15 +178,59 @@ model RateLimit {
 }
 
 model UserKey {
-  id         String   @id @default(uuid())
-  user_id    String
-  public_key String   @db.Text
-  created_at DateTime @default(now())
+  id                    String   @id @default(uuid())
+  user_id               String
+  device_id             String?
+  public_key            String   @db.Text
+  encrypted_private_key String?  @db.Text
+  private_key_salt      String?  @db.Text
+  private_key_hint      String?
+  created_at            DateTime @default(now())
+  updated_at            DateTime @default(now()) @updatedAt
 
-  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user                  User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([user_id])
+  @@index([user_id, device_id])
   @@map("user_keys")
+}
+
+model UnlockCredential {
+  id               String    @id @default(uuid())
+  user_id          String
+  type             String
+  label            String?
+  salt             String    @db.Text
+  verifier         String?   @db.Text
+  encrypted_secret String?   @db.Text
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+  last_used_at     DateTime?
+
+  user             User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, type])
+  @@map("unlock_credentials")
+}
+
+model PasskeyCredential {
+  id               String    @id @default(uuid())
+  user_id          String
+  credential_id    String    @unique @db.Text
+  public_key       String    @db.Text
+  counter          Int       @default(0)
+  transports       String?   @db.Text
+  name             String?
+  encrypted_secret String?   @db.Text
+  secret_salt      String?   @db.Text
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+  last_used_at     DateTime?
+
+  user             User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("passkey_credentials")
 }
 
 model Conversation {
@@ -212,6 +258,8 @@ model Message {
   is_edited         Boolean  @default(false)
   is_deleted        Boolean  @default(false)
   reactions         String?  @db.Text
+  burn_after_view   Boolean  @default(false)
+  burned_at         DateTime?
   created_at        DateTime @default(now())
 
   conversation      Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
@@ -260,6 +308,8 @@ model GroupMessage {
   is_edited         Boolean  @default(false)
   is_deleted        Boolean  @default(false)
   reactions         String?  @db.Text
+  burn_after_view   Boolean  @default(false)
+  burned_at         DateTime?
   created_at        DateTime @default(now())
 
   group             Group    @relation(fields: [group_id], references: [id], onDelete: Cascade)
@@ -353,7 +403,7 @@ model CloudConnection {
   encrypted_credentials String   @db.Text
   is_default            Boolean  @default(false)
   created_at            DateTime @default(now())
-  updated_at            DateTime @updatedAt
+  updated_at            DateTime @default(now()) @updatedAt
 
   user                  User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 

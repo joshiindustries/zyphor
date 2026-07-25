@@ -91,7 +91,7 @@ export default function RegisterPage() {
               placeholder="Strong password"
             />
             <p style={{ marginTop: "0.5rem", fontSize: "0.8rem", color: "var(--text-secondary)" }}>
-              Use at least 12 characters with uppercase, lowercase, number, and symbol.
+              Use at least 12 characters with uppercase, lowercase, number, and symbol. You can add PIN and passkey unlock records from Keys & Passkeys after login.
             </p>
           </div>
           {TURNSTILE_ENABLED ? (

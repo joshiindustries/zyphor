@@ -152,30 +152,34 @@ function MessageContentRenderer({ msg, isMe }: { msg: any, isMe: boolean }) {
   let parsed: any = null;
   try { parsed = JSON.parse(displayMsg); } catch (e) {}
 
-  useEffect(() => {
-    if (msg.is_deleted || isBurned || !parsed?.viewOnce || isMe) return;
+  const isBurnerMessage = Boolean(msg.burn_after_view || parsed?.viewOnce);
 
-    const url = msg.group_id ? `/api/groups/messages/${msg.id}` : `/api/chat/messages/${msg.id}`;
-    fetch(url, {
-      method: "PATCH",
-      headers: withCsrfHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ is_deleted: true })
-    }).catch(console.error);
+  useEffect(() => {
+    if (msg.is_deleted || isBurned || !isBurnerMessage || isMe) return;
 
     setTimeLeft(15);
-    const timer = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev && prev <= 1) {
-          clearInterval(timer);
-          setIsBurned(true);
-          return 0;
-        }
-        return prev ? prev - 1 : 0;
-      });
+    const interval = window.setInterval(() => {
+      setTimeLeft(prev => Math.max((prev ?? 15) - 1, 0));
     }, 1000);
 
-    return () => clearInterval(timer);
-  }, [msg.id, msg.group_id, msg.is_deleted, isMe, isBurned, parsed?.viewOnce]);
+    const burnTimer = window.setTimeout(() => {
+      const url = msg.group_id ? `/api/groups/messages/${msg.id}` : `/api/chat/messages/${msg.id}`;
+      fetch(url, {
+        method: "PATCH",
+        headers: withCsrfHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ is_deleted: true, burn_after_view: true })
+      })
+        .then((res) => {
+          if (res.ok) setIsBurned(true);
+        })
+        .catch(console.error);
+    }, 15000);
+
+    return () => {
+      window.clearInterval(interval);
+      window.clearTimeout(burnTimer);
+    };
+  }, [msg.id, msg.group_id, msg.is_deleted, isMe, isBurned, isBurnerMessage]);
 
   if (isBurned) {
     return <div style={{ fontStyle: "italic", opacity: 0.7, color: "var(--accent-red)" }}>Message self-destructed</div>;
@@ -187,7 +191,7 @@ function MessageContentRenderer({ msg, isMe }: { msg: any, isMe: boolean }) {
 
   return (
     <div>
-      {parsed && parsed.viewOnce && (
+      {isBurnerMessage && (
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "var(--accent-red)", fontSize: "0.8rem", marginBottom: "0.5rem", fontWeight: "bold", background: "rgba(239, 68, 68, 0.1)", padding: "0.25rem 0.5rem", borderRadius: "4px" }}>
           <Flame size={14} className="animate-pulse" /> View Once {timeLeft !== null && !isMe && `(${timeLeft}s)`}
         </div>
@@ -227,8 +231,6 @@ export default function ChatClient({
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [chatError, setChatError] = useState("");
-
-  const [activeCall, setActiveCall] = useState<any>(null);
 
   // DM Creation State
   const [isCreatingDM, setIsCreatingDM] = useState(false);
@@ -274,10 +276,10 @@ export default function ChatClient({
 
   const loadNotifications = async () => {
     try {
-      const res = await fetch("/api/notifications?limit=20");
+      const res = await fetch("/api/notifications/live?lookbackSeconds=86400&limit=20", { cache: "no-store" });
       if (!res.ok) return;
       const data = await res.json();
-      if (data.success) setNotifications(data.notifications || []);
+      if (data.success) setNotifications(data.events || []);
     } catch (err) {
       console.error("Failed to load notifications", err);
     }
@@ -295,22 +297,12 @@ export default function ChatClient({
       return;
     }
 
-    await fetch("/api/notifications", {
-      method: "PATCH",
-      headers: withCsrfHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ ids: [notification.id], is_read: true })
-    });
+    setNotifications(current => current.filter(item => item.id !== notification.id));
     setShowNotifications(false);
-    await loadNotifications();
   };
 
   const markAllNotificationsRead = async () => {
-    await fetch("/api/notifications", {
-      method: "PATCH",
-      headers: withCsrfHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ all: true, is_read: true })
-    });
-    await loadNotifications();
+    setNotifications([]);
   };
 
   useEffect(() => {
@@ -345,29 +337,6 @@ export default function ChatClient({
     return () => clearTimeout(timer);
   }, [dmSearchQuery, groupSearchQuery, isCreatingDM, isCreatingGroup]);
 
-  useEffect(() => {
-    // Poll for active calls
-    const fetchActiveCalls = async () => {
-      try {
-        const res = await fetch("/api/calls");
-        if (res.ok) {
-          const data = await res.json();
-          if (data.success && data.calls.length > 0) {
-            const incoming = data.calls.find((c: any) => c.caller_id !== sessionUser.id && c.status === "RINGING");
-            setActiveCall(incoming || null);
-          } else {
-            setActiveCall(null);
-          }
-        }
-      } catch (err) {
-        console.error(err);
-      }
-    };
-
-    fetchActiveCalls();
-    const callInterval = setInterval(fetchActiveCalls, 3000);
-    return () => clearInterval(callInterval);
-  }, [sessionUser.id]);
 
   useEffect(() => {
     if (!activeId) return;
@@ -462,6 +431,7 @@ export default function ChatClient({
         else body.group_id = activeId;
 
         if (replyingTo) body.reply_to_id = replyingTo.id;
+        body.burn_after_view = isBurnerMode;
 
         const res = await fetch(url, {
           method: "POST",
@@ -668,37 +638,6 @@ export default function ChatClient({
 
   return (
     <main style={{ height: "100vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-      {activeCall && (
-        <div style={{ background: "var(--accent-green)", padding: "1rem", display: "flex", justifyContent: "space-between", alignItems: "center", color: "#fff", zIndex: 100 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-            {activeCall.media_type === "AUDIO" ? <Phone size={24} /> : <Video size={24} />}
-            <div>
-              <strong style={{ display: "block" }}>{activeCall.media_type === "AUDIO" ? "Incoming Audio Call" : "Incoming Video Call"}</strong>
-              <span style={{ fontSize: "0.85rem" }}>from {activeCall.caller.name}</span>
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: "0.5rem" }}>
-            <button className="btn btn-secondary" style={{ background: "rgba(0,0,0,0.2)", border: "none", color: "#fff" }} onClick={async () => {
-              await fetch("/api/calls", {
-                method: "PATCH",
-                headers: withCsrfHeaders({ "Content-Type": "application/json" }),
-                body: JSON.stringify({ call_id: activeCall.id, status: "ENDED" })
-              });
-              setActiveCall(null);
-            }}>Decline</button>
-            <button className="btn btn-primary" style={{ background: "#fff", color: "var(--accent-green)", border: "none" }} onClick={async () => {
-              await fetch("/api/calls", {
-                method: "PATCH",
-                headers: withCsrfHeaders({ "Content-Type": "application/json" }),
-                body: JSON.stringify({ call_id: activeCall.id, status: "ONGOING" })
-              });
-              window.location.href = `/chat/call/${activeCall.id}`;
-            }}>
-              Accept
-            </button>
-          </div>
-        </div>
-      )}
 
       <header style={{ padding: "1rem 2rem", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--glass-border)", background: "var(--glass-bg)", flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
