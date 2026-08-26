@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 
 type DesktopClaims = { sub: string; exp: number; aud: "zyphor-desktop"; version: 1 };
+type DesktopCodeClaims = { sub: string; exp: number; aud: "zyphor-desktop-code"; redirect: string; challenge: string; version: 1 };
 
 function secret(): string | null {
   const value = process.env.DESKTOP_AUTH_SECRET?.trim();
@@ -17,6 +18,26 @@ export function issueDesktopToken(userId: string): string | null {
   const payload: DesktopClaims = { sub: userId, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7, aud: "zyphor-desktop", version: 1 };
   const content = `${encode(JSON.stringify({ alg: "HS256", typ: "JWT" }))}.${encode(JSON.stringify(payload))}`;
   return `${content}.${sign(content)}`;
+}
+
+export function issueDesktopCode(userId: string, redirect: string, challenge: string): string | null {
+  if (!secret()) return null;
+  const payload: DesktopCodeClaims = { sub: userId, redirect, challenge, exp: Math.floor(Date.now() / 1000) + 120, aud: "zyphor-desktop-code", version: 1 };
+  const content = `${encode(JSON.stringify({ alg: "HS256", typ: "JWT" }))}.${encode(JSON.stringify(payload))}`;
+  return `${content}.${sign(content)}`;
+}
+
+export function redeemDesktopCode(code: string, redirect: string, verifier: string): string | null {
+  const parts = code.split(".");
+  if (parts.length !== 3 || !secret()) return null;
+  const content = `${parts[0]}.${parts[1]}`; const supplied = Buffer.from(parts[2]); const expected = Buffer.from(sign(content));
+  if (supplied.length !== expected.length || !crypto.timingSafeEqual(supplied, expected)) return null;
+  try {
+    const claims = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8")) as DesktopCodeClaims;
+    const derived = crypto.createHash("sha256").update(verifier).digest("base64url");
+    if (claims.aud !== "zyphor-desktop-code" || claims.version !== 1 || claims.exp <= Math.floor(Date.now() / 1000) || claims.redirect !== redirect || !crypto.timingSafeEqual(Buffer.from(claims.challenge), Buffer.from(derived))) return null;
+    return issueDesktopToken(claims.sub);
+  } catch { return null; }
 }
 
 export async function getDesktopUser(request: NextRequest | Request) {

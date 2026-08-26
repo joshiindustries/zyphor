@@ -19,9 +19,11 @@ export default function DesktopLoginPage() {
   async function submit(event: FormEvent) {
     event.preventDefault(); setLoading(true); setError("");
     try {
-      const response = await fetch("/api/desktop/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password, turnstileToken: enabled ? turnstileToken : undefined }) });
+      const query = new URLSearchParams(window.location.search); const redirectUri = query.get("redirect_uri"); const state = query.get("state"); const codeChallenge = query.get("code_challenge");
+      const response = await fetch("/api/desktop/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password, turnstileToken: enabled ? turnstileToken : undefined, redirectUri: redirectUri || undefined, codeChallenge: codeChallenge || undefined }) });
       const data = await response.json();
       if (!response.ok || !data?.success) throw new Error(data?.error || "Sign-in failed.");
+      if (redirectUri && state && data.code) { window.location.assign(`${redirectUri}?code=${encodeURIComponent(data.code)}&state=${encodeURIComponent(state)}`); return; }
       if (!window.zyphorDesktop) throw new Error("Open this page from Zyphor Desktop to finish sign-in.");
       window.zyphorDesktop.authenticated(data.token, data.user.id, data.user.email || "", data.user.name || "Zyphor User");
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Sign-in failed."); }
