@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
       return noStoreJson({ error: "Invalid request origin" }, { status: 403 });
     }
 
-    const user = await getUser();
+    const user = await getUser(request);
     if (!user) {
       return noStoreJson({ error: "Unauthorized" }, { status: 401 });
     }

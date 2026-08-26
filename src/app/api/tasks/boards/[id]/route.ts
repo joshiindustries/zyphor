@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
   try {
-    const user = await getUser();
+    const user = await getUser(request);
     if (!user) {
       return noStoreJson({ error: "Unauthorized" }, { status: 401 });
     }
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
 
 export async function DELETE(request: NextRequest, props: { params: Promise<{ id: string }> }) {
   try {
-    const user = await getUser();
+    const user = await getUser(request);
     if (!user) {
       return noStoreJson({ error: "Unauthorized" }, { status: 401 });
     }

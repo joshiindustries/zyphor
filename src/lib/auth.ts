@@ -9,6 +9,7 @@ import { getAvatarFromSupabaseUser, getNameFromSupabaseUser, isSupabaseAuthConfi
 import { isValidEmail, normalizeEmail } from "@/lib/security";
 import { databaseUnavailableMessage, isPrismaDatabaseConnectivityError, isPrismaSchemaMissingError, schemaMissingMessage } from "@/lib/prisma-errors";
 import { cookies } from "next/headers";
+import { getDesktopUser } from "@/lib/desktop-auth";
 import { sendOtpEmail } from "@/lib/email";
 
 function sanitizeDisplayName(input: unknown): string | null {
@@ -318,8 +319,12 @@ function isDynamicServerUsageError(error: unknown): error is DynamicServerUsageE
   return (error as DynamicServerUsageError).digest === "DYNAMIC_SERVER_USAGE";
 }
 
-export async function getUser() {
+export async function getUser(request?: Request) {
   try {
+    if (request) {
+      const desktopUser = await getDesktopUser(request);
+      if (desktopUser) return desktopUser as any;
+    }
     const session = await getServerSession(authOptions);
     if (!session || !session.user) return null;
     return session.user as any;

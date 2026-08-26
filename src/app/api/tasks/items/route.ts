@@ -5,7 +5,7 @@ import { noStoreJson } from "@/lib/security";
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await getUser();
+    const user = await getUser(request);
     if (!user) {
       return noStoreJson({ error: "Unauthorized" }, { status: 401 });
     }
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const user = await getUser();
+    const user = await getUser(request);
     if (!user) {
       return noStoreJson({ error: "Unauthorized" }, { status: 401 });
     }
