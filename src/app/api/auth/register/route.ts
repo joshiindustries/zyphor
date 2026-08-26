@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { getClientIp, isSameOrigin, isValidEmail, noStoreJson, normalizeEmail, validatePasswordStrength } from '@/lib/security';
 import { isSupabaseAuthConfigured, supabaseSignUpWithPassword } from '@/lib/supabase-auth';
+import { verifyTurnstileFromRequest } from '@/lib/turnstile';
 import { databaseUnavailableMessage, isPrismaDatabaseConnectivityError, isPrismaSchemaMissingError, schemaMissingMessage } from '@/lib/prisma-errors';
 
 export async function POST(request: NextRequest) {
@@ -30,6 +31,10 @@ export async function POST(request: NextRequest) {
     const passwordError = validatePasswordStrength(password);
     if (passwordError) {
       return noStoreJson({ error: passwordError }, { status: 400 });
+    }
+
+    if (!(await verifyTurnstileFromRequest(turnstileToken, request))) {
+      return noStoreJson({ error: 'CAPTCHA validation failed.' }, { status: 403 });
     }
 
     const identifier = `${getClientIp(request)}:${email}`;

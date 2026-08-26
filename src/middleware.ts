@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { CSRF_COOKIE_NAME, CSRF_HEADER_NAME } from "@/lib/csrf-shared";
+import { hasDesktopBearerHeader } from "@/lib/desktop-auth";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const CSRF_PROTECTED_PREFIXES = [
@@ -54,7 +55,7 @@ export function middleware(request: NextRequest) {
   const csrfCookie = request.cookies.get(CSRF_COOKIE_NAME)?.value;
   const csrfHeader = request.headers.get(CSRF_HEADER_NAME);
 
-  if (shouldProtect) {
+  if (shouldProtect && !hasDesktopBearerHeader(request)) {
     if (!hasValidSameOrigin(request)) {
       return NextResponse.json({ error: "Invalid request origin" }, { status: 403 });
     }

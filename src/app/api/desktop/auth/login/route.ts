@@ -4,17 +4,7 @@ import { issueDesktopCode, issueDesktopToken } from "@/lib/desktop-auth";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getClientIp, isValidEmail, noStoreJson, normalizeEmail } from "@/lib/security";
 import { getNameFromSupabaseUser, isSupabaseAuthConfigured, supabaseSignInWithPassword } from "@/lib/supabase-auth";
-
-async function verifyTurnstile(token: unknown, ip: string): Promise<boolean> {
-  if (process.env.TURNSTILE_ENFORCE === "false") return true;
-  const secret = process.env.TURNSTILE_SECRET_KEY;
-  if (!secret || typeof token !== "string" || !token) return false;
-  const form = new URLSearchParams({ secret, response: token, remoteip: ip });
-  const result = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form });
-  if (!result.ok) return false;
-  const data = await result.json();
-  return data?.success === true;
-}
+import { verifyTurnstileFromRequest } from "@/lib/turnstile";
 
 /** Native-client login. Requires Cloudflare Turnstile and Supabase credentials; never returns a service credential. */
 export async function POST(request: NextRequest) {
@@ -24,7 +14,7 @@ export async function POST(request: NextRequest) {
     const ip = getClientIp(request);
     if (!isValidEmail(email) || typeof password !== "string" || !password || password.length > 1024) return noStoreJson({ error: "Invalid email or password." }, { status: 400 });
     if (!(await checkRateLimit(`${ip}:${email}`, "desktop_login", 5, 15))) return noStoreJson({ error: "Too many login attempts. Try again later." }, { status: 429 });
-    if (!(await verifyTurnstile(turnstileToken, ip))) return noStoreJson({ error: "CAPTCHA validation failed." }, { status: 403 });
+    if (!(await verifyTurnstileFromRequest(turnstileToken, request))) return noStoreJson({ error: "CAPTCHA validation failed." }, { status: 403 });
     if (!isSupabaseAuthConfigured()) return noStoreJson({ error: "Authentication is temporarily unavailable." }, { status: 503 });
     const result = await supabaseSignInWithPassword({ email, password, captchaToken: turnstileToken });
     if (!result.ok) return noStoreJson({ error: result.error || "Invalid credentials." }, { status: result.status || 401 });

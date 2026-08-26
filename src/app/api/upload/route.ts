@@ -4,6 +4,7 @@ import { getUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { getClientIp, isSameOrigin, isValidLinkId, noStoreJson } from '@/lib/security';
+import { verifyTurnstileFromRequest } from '@/lib/turnstile';
 import {
   databaseUnavailableMessage,
   isPrismaClientOutOfSyncError,
@@ -27,6 +28,13 @@ export async function POST(request: NextRequest) {
     }
 
     const formData = await request.formData();
+
+    if (!hasDesktopBearer) {
+      const captchaOk = await verifyTurnstileFromRequest(formData.get('turnstileToken'), request);
+      if (!captchaOk) {
+        return noStoreJson({ success: false, error: 'CAPTCHA validation failed.' }, { status: 403 });
+      }
+    }
     
     const files = formData.getAll('files') as File[];
     if (files.length === 0) {

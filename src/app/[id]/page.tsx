@@ -7,6 +7,7 @@ import { useSession } from "next-auth/react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { withCsrfHeaders } from "@/lib/csrf-client";
+import { Turnstile } from "@marsidev/react-turnstile";
 
 import { Suspense } from "react";
 
@@ -18,6 +19,9 @@ function DownloadPageContent() {
   const [decrypting, setDecrypting] = useState(false);
   const [allowSave, setAllowSave] = useState(true);
   const [requiresAuth, setRequiresAuth] = useState(false);
+  const [passwordProtected, setPasswordProtected] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const turnstileEnabled = process.env.NEXT_PUBLIC_TURNSTILE_ENABLED?.toLowerCase() !== "false";
   
   const { data: session, status } = useSession();
   const routeParams = useParams<{ id: string }>();
@@ -74,6 +78,7 @@ function DownloadPageContent() {
         } else {
           setFiles(data.files || []);
           setAllowSave(data.allowSave !== 0 && data.allowSave !== false);
+          setPasswordProtected(Boolean(data.passwordProtected));
         }
         setLoading(false);
       })
@@ -88,8 +93,12 @@ function DownloadPageContent() {
       setError("Invalid link.");
       return;
     }
-    if (!password) {
+    if (passwordProtected && !password) {
       setError("Password is required to decrypt the file.");
+      return;
+    }
+    if (status !== "authenticated" && turnstileEnabled && !turnstileToken) {
+      setError("Complete the Cloudflare Turnstile check.");
       return;
     }
     
@@ -98,7 +107,10 @@ function DownloadPageContent() {
     
     try {
       // Fetch encrypted file stream
-      const response = await fetch(`/api/download/${linkId}?fileId=${file.id}`);
+      const tokenQuery = status !== "authenticated" && turnstileToken
+        ? `&turnstileToken=${encodeURIComponent(turnstileToken)}`
+        : "";
+      const response = await fetch(`/api/download/${linkId}?fileId=${file.id}${tokenQuery}`);
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
         throw new Error(payload?.error || "Failed to download file stream.");
@@ -175,10 +187,13 @@ function DownloadPageContent() {
       <div className="glass-panel" style={{ maxWidth: "500px", textAlign: "center" }}>
         <ShieldCheck color="var(--accent-blue)" size={48} style={{ margin: "0 auto 1.5rem auto" }} />
         <h2 className="title-gradient" style={{ fontSize: "2rem", fontWeight: "700", marginBottom: "0.5rem" }}>Secure Download</h2>
-        <p style={{ color: "var(--text-secondary)", marginBottom: "2rem" }}>{files.length} file(s) shared with you. Enter the password to decrypt.</p>
+        <p style={{ color: "var(--text-secondary)", marginBottom: "2rem" }}>
+          {files.length} file(s) shared with you.{passwordProtected ? " Enter the password to decrypt locally." : " This transfer is ready to download."}
+        </p>
 
         {error && <div style={{ color: "#ff4444", marginBottom: "1rem", fontSize: "0.9rem", background: "rgba(255, 0, 0, 0.1)", padding: "0.75rem", borderRadius: "var(--radius-sm)" }}>{error}</div>}
 
+        {passwordProtected && (
         <div style={{ textAlign: "left", marginBottom: "2rem" }}>
           <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", color: "var(--text-secondary)" }}>Decryption Password</label>
           <div style={{ position: "relative" }}>
@@ -193,6 +208,13 @@ function DownloadPageContent() {
             />
           </div>
         </div>
+        )}
+
+        {status !== "authenticated" && turnstileEnabled && (
+          <div style={{ marginBottom: "1.5rem", display: "flex", justifyContent: "center" }}>
+            <Turnstile siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "1x00000000000000000000AA"} onSuccess={setTurnstileToken} onExpire={() => setTurnstileToken("")} />
+          </div>
+        )}
 
         {session && !saved && status === "authenticated" && allowSave && (
           <div style={{ marginBottom: "2rem" }}>
@@ -226,7 +248,7 @@ function DownloadPageContent() {
               </div>
               <button 
                 onClick={() => handleDownload(file)} 
-                disabled={decrypting}
+                disabled={decrypting || (status !== "authenticated" && turnstileEnabled && !turnstileToken)}
                 className="btn btn-primary" 
                 style={{ padding: "0.5rem 1rem", fontSize: "0.9rem" }}
               >

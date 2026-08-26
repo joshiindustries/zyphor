@@ -5,6 +5,7 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { getClientIp, isValidLinkId, isValidUuid, noStoreJson } from '@/lib/security';
 import { databaseUnavailableMessage, isPrismaDatabaseConnectivityError } from '@/lib/prisma-errors';
 import { downloadSupabaseObject, isSupabaseStorageError } from '@/lib/supabase-storage';
+import { verifyTurnstileFromRequest } from '@/lib/turnstile';
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,7 @@ export async function GET(
       return noStoreJson({ error: 'Link not found' }, { status: 404 });
     }
 
-    const user = await getUser();
+    const user = await getUser(request);
     const requiresAuth = link.auth_required === 1;
     if (requiresAuth && !user?.id) {
       return noStoreJson(
@@ -78,16 +79,20 @@ export async function GET(
     }
 
     if (!downloadFileId) {
-      // Just return metadata
+      const passwordProtected = files.some((f: DownloadFileRow) => Boolean(f.salt && f.iv));
       return noStoreJson({
         allowSave: link.allow_save,
         authRequired: requiresAuth,
+        passwordProtected,
+        expiresAt: link.expires_at,
+        remainingDownloads: link.max_downloads > 0 ? Math.max(0, link.max_downloads - link.current_downloads) : null,
         files: files.map((f: DownloadFileRow) => ({
           id: f.id,
           name: f.original_name,
           size: f.size,
           salt: f.salt,
-          iv: f.iv
+          iv: f.iv,
+          encrypted: Boolean(f.salt && f.iv),
         }))
       });
     }
@@ -95,6 +100,14 @@ export async function GET(
     const file = files.find((f: DownloadFileRow) => f.id === downloadFileId);
     if (!file) {
       return noStoreJson({ error: 'File not found in link' }, { status: 404 });
+    }
+
+    if (!user?.id) {
+      const turnstileToken = searchParams.get('turnstileToken') || request.headers.get('x-turnstile-token');
+      const captchaOk = await verifyTurnstileFromRequest(turnstileToken, request);
+      if (!captchaOk) {
+        return noStoreJson({ error: 'CAPTCHA validation failed.', turnstileRequired: true }, { status: 403 });
+      }
     }
 
     const storageResponse = await downloadSupabaseObject(file.storage_path);

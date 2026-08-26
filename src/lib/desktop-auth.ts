@@ -6,7 +6,7 @@ type DesktopClaims = { sub: string; exp: number; aud: "zyphor-desktop"; version:
 type DesktopCodeClaims = { sub: string; exp: number; aud: "zyphor-desktop-code"; redirect: string; challenge: string; version: 1 };
 
 function secret(): string | null {
-  const value = process.env.DESKTOP_AUTH_SECRET?.trim();
+  const value = (process.env.DESKTOP_AUTH_SECRET || process.env.NEXTAUTH_SECRET)?.trim();
   return value && value.length >= 32 ? value : null;
 }
 
@@ -35,9 +35,15 @@ export function redeemDesktopCode(code: string, redirect: string, verifier: stri
   try {
     const claims = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8")) as DesktopCodeClaims;
     const derived = crypto.createHash("sha256").update(verifier).digest("base64url");
-    if (claims.aud !== "zyphor-desktop-code" || claims.version !== 1 || claims.exp <= Math.floor(Date.now() / 1000) || claims.redirect !== redirect || !crypto.timingSafeEqual(Buffer.from(claims.challenge), Buffer.from(derived))) return null;
+    const challenge = Buffer.from(claims.challenge);
+    const expectedChallenge = Buffer.from(derived);
+    if (claims.aud !== "zyphor-desktop-code" || claims.version !== 1 || claims.exp <= Math.floor(Date.now() / 1000) || claims.redirect !== redirect || challenge.length !== expectedChallenge.length || !crypto.timingSafeEqual(challenge, expectedChallenge)) return null;
     return issueDesktopToken(claims.sub);
   } catch { return null; }
+}
+
+export function hasDesktopBearerHeader(request: NextRequest | Request): boolean {
+  return /^Bearer\s+\S+$/.test(request.headers.get("authorization") || "");
 }
 
 export async function getDesktopUser(request: NextRequest | Request) {

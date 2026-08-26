@@ -5,9 +5,9 @@ import { noStoreJson } from '@/lib/security';
 
 export const dynamic = "force-dynamic";
 
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    const sessionUser = await getUser();
+    const sessionUser = await getUser(request);
     if (!sessionUser?.id) {
       return noStoreJson({ user: null });
     }
@@ -19,6 +19,8 @@ export async function GET(_request: NextRequest) {
         email: true,
         name: true,
         avatar: true,
+        username: true,
+        bio: true,
       },
     });
 
@@ -34,6 +36,8 @@ export async function GET(_request: NextRequest) {
         name: dbUser.name || sessionUser.name || null,
         image: dbUser.avatar || sessionUser.image || null,
         avatar: dbUser.avatar || sessionUser.image || null,
+        username: dbUser.username || null,
+        bio: dbUser.bio || null,
       },
     });
   } catch {

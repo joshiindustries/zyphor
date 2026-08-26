@@ -23,7 +23,8 @@ function isSafeAvatarInput(value: string): boolean {
 
 export async function POST(request: NextRequest) {
   try {
-    if (!isSameOrigin(request)) {
+    const hasDesktopBearer = /^Bearer\s+\S+$/.test(request.headers.get("authorization") || "");
+    if (!isSameOrigin(request) && !hasDesktopBearer) {
       return noStoreJson({ error: "Invalid request origin" }, { status: 403 });
     }
 

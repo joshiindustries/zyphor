@@ -55,6 +55,11 @@ export function getClientIp(request: NextRequest): string {
   return request.headers.get("x-real-ip") || "unknown";
 }
 
+export function isDesktopLoopbackRedirect(value: string, path: "callback" | "turnstile" | "callback|turnstile" = "callback"): boolean {
+  const allowedPath = path === "callback|turnstile" ? "(callback|turnstile)" : path;
+  return new RegExp(`^http://(127\\.0\\.0\\.1|localhost):\\d{2,5}/${allowedPath}$`).test(value);
+}
+
 export function isSameOrigin(request: NextRequest): boolean {
   const origin = request.headers.get("origin");
   const host = request.headers.get("host");

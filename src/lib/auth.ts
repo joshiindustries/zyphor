@@ -11,6 +11,8 @@ import { databaseUnavailableMessage, isPrismaDatabaseConnectivityError, isPrisma
 import { cookies } from "next/headers";
 import { getDesktopUser } from "@/lib/desktop-auth";
 import { sendOtpEmail } from "@/lib/email";
+import { headers } from "next/headers";
+import { verifyTurnstile } from "@/lib/turnstile";
 
 function sanitizeDisplayName(input: unknown): string | null {
   if (typeof input !== "string") return null;
@@ -29,47 +31,6 @@ function sanitizeAvatarUrl(input: unknown): string | null {
     return url.toString();
   } catch {
     return null;
-  }
-}
-
-function shouldEnforceTurnstile(): boolean {
-  if (process.env.TURNSTILE_ENFORCE === "true") return true;
-  if (process.env.TURNSTILE_ENFORCE === "false") return false;
-  return process.env.NODE_ENV === "production";
-}
-
-async function verifyTurnstile(token?: string | null): Promise<boolean> {
-  if (!shouldEnforceTurnstile()) {
-    // In local/dev environments, allow auth flow to continue even if Turnstile is blocked.
-    return true;
-  }
-
-  if (!token) return false;
-
-  const secretKey = process.env.TURNSTILE_SECRET_KEY;
-  if (!secretKey) {
-    console.error("TURNSTILE_SECRET_KEY is missing.");
-    return false;
-  }
-
-  const formData = new URLSearchParams();
-  formData.append("secret", secretKey);
-  formData.append("response", token);
-
-  try {
-    const verifyRes = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-      method: "POST",
-      body: formData,
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    });
-
-    if (!verifyRes.ok) return false;
-
-    const verifyData = await verifyRes.json();
-    return Boolean(verifyData?.success);
-  } catch (error) {
-    console.error("Turnstile verification failed:", error);
-    return false;
   }
 }
 
@@ -322,8 +283,16 @@ function isDynamicServerUsageError(error: unknown): error is DynamicServerUsageE
 export async function getUser(request?: Request) {
   try {
     if (request) {
-      const desktopUser = await getDesktopUser(request);
-      if (desktopUser) return desktopUser as any;
+      const authorization = request.headers.get("authorization") || "";
+      if (authorization.startsWith("Bearer ")) {
+        // Invalid desktop tokens must not fall back to a browser cookie session.
+        return (await getDesktopUser(request)) as any;
+      }
+    } else {
+      const authorization = (await headers()).get("authorization");
+      if (authorization?.startsWith("Bearer ")) {
+        return (await getDesktopUser(new Request("https://zyphorr.vercel.app", { headers: { authorization } }))) as any;
+      }
     }
     const session = await getServerSession(authOptions);
     if (!session || !session.user) return null;
@@ -377,13 +346,6 @@ async function verifyDeviceAndReturn(user: any, fingerprintHash: string) {
       }
     });
 
-    console.log(`\n\n========================================`);
-    console.log(`ðŸ”’ NEW DEVICE LOGIN DETECTED`);
-    console.log(`ðŸ“§ To: ${user.email}`);
-    console.log(`ðŸ”‘ OTP: ${otp}`);
-    console.log(`========================================\n\n`);
-
-    // Send the actual email
     await sendOtpEmail(user.email, otp);
 
     throw new Error("device_verification_required");

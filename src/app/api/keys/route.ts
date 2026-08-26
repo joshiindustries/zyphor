@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { getUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { noStoreJson } from "@/lib/security";
+import { isSameOrigin, noStoreJson } from "@/lib/security";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +13,11 @@ function cleanText(value: unknown, maxLength: number): string | null {
 
 export async function POST(request: NextRequest) {
   try {
+    const hasDesktopBearer = /^Bearer\s+\S+$/.test(request.headers.get("authorization") || "");
+    if (!isSameOrigin(request) && !hasDesktopBearer) {
+      return noStoreJson({ error: "Invalid request origin" }, { status: 403 });
+    }
+
     const user = await getUser(request);
     if (!user) {
       return noStoreJson({ error: "Unauthorized" }, { status: 401 });
