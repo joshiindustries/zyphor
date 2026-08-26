@@ -1,5 +1,3 @@
-import { redirect } from "next/navigation";
+import TransferClient from "./TransferClient";
 
-export default function HomePage() {
-  redirect("/dashboard");
-}
+export default function HomePage() { return <TransferClient />; }

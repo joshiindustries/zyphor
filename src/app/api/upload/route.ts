@@ -19,7 +19,10 @@ import {
 
 export async function POST(request: NextRequest) {
   try {
-    if (!isSameOrigin(request)) {
+    // Browser sessions remain CSRF-protected. Native clients authenticate explicitly
+    // with a Bearer token, which browsers cannot attach cross-site automatically.
+    const hasDesktopBearer = /^Bearer\s+\S+$/.test(request.headers.get("authorization") || "");
+    if (!isSameOrigin(request) && !hasDesktopBearer) {
       return noStoreJson({ success: false, error: 'Invalid request origin' }, { status: 403 });
     }
 
@@ -38,7 +41,7 @@ export async function POST(request: NextRequest) {
     const maxDownloads = Number.isFinite(maxDownloadsRaw) ? Math.max(0, Math.min(maxDownloadsRaw, 1000)) : 0;
     
     // Enforce authentication: Guest uploads are strictly prohibited
-    const user = await getUser();
+    const user = await getUser(request);
     if (!user) {
       return noStoreJson({ success: false, error: 'Unauthorized. Guest uploads are not allowed.' }, { status: 401 });
     }
