@@ -8,11 +8,14 @@ import { encryptFile } from "@/lib/crypto";
 import { generateMemorablePassphrase } from "@/lib/words";
 import { withCsrfHeaders } from "@/lib/csrf-client";
 import SiteFooter from "@/components/SiteFooter";
+import { Turnstile } from "@marsidev/react-turnstile";
 
 // Define the available password modes
 type PasswordMode = "auto" | "random" | "memorable" | "custom" | "webrtc";
 type PreviewKind = "image" | "video" | "audio" | "pdf";
 const MAX_UPLOAD_FILE_BYTES = 50 * 1024 * 1024;
+const TURNSTILE_FLAG = process.env.NEXT_PUBLIC_TURNSTILE_ENABLED?.toLowerCase();
+const TURNSTILE_ENABLED = TURNSTILE_FLAG === "true" ? true : TURNSTILE_FLAG === "false" ? false : process.env.NODE_ENV === "production";
 
 async function readUploadResponse(response: Response): Promise<{ success?: boolean; error?: string; linkId?: string }> {
   const responseText = await response.text();
@@ -60,6 +63,7 @@ export default function Home() {
 
   const [user, setUser] = useState<any>(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   const [isWebrtcConnecting, setIsWebrtcConnecting] = useState(false);
   const [webrtcStatus, setWebrtcStatus] = useState("");
@@ -300,6 +304,10 @@ export default function Home() {
       router.push("/login?next=%2F");
       return;
     }
+    if (TURNSTILE_ENABLED && !turnstileToken) {
+      alert("Please complete the security check before uploading.");
+      return;
+    }
 
     if (files.length === 0) return alert("Files are required.");
     
@@ -337,6 +345,7 @@ export default function Home() {
       formData.append("isProtected", "true");
       formData.append("allowSave", allowSave.toString());
       formData.append("authRequired", authRequired.toString());
+      if (TURNSTILE_ENABLED && turnstileToken) formData.append("turnstileToken", turnstileToken);
 
       
       if (customLinkId) {
@@ -390,6 +399,7 @@ export default function Home() {
       } else {
         throw new Error(data.error || "Upload failed. Please try again.");
       }
+      setTurnstileToken(null);
     } catch (err) {
       console.error(err);
       alert("Upload failed. " + err);
@@ -652,6 +662,17 @@ export default function Home() {
               {isLoadingAuth && (
                 <div style={{ background: "rgba(59, 130, 246, 0.1)", border: "1px solid var(--accent-blue)", padding: "0.75rem", borderRadius: "var(--radius-sm)", textAlign: "center", color: "var(--text-secondary)", fontSize: "0.85rem" }}>
                   Loading, please wait...
+                </div>
+              )}
+
+              {TURNSTILE_ENABLED && user && (
+                <div style={{ display: "flex", justifyContent: "center", minHeight: "65px" }}>
+                  <Turnstile
+                    siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "1x00000000000000000000AA"}
+                    onSuccess={setTurnstileToken}
+                    onExpire={() => setTurnstileToken(null)}
+                    onError={() => setTurnstileToken(null)}
+                  />
                 </div>
               )}
 

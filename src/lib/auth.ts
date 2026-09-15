@@ -7,6 +7,7 @@ import crypto from "crypto";
 import { checkRateLimit, clearRateLimit } from "@/lib/rate-limit";
 import { getAvatarFromSupabaseUser, getNameFromSupabaseUser, isSupabaseAuthConfigured, supabaseSignInWithPassword } from "@/lib/supabase-auth";
 import { isValidEmail, normalizeEmail } from "@/lib/security";
+import { verifyTurnstile } from "@/lib/turnstile";
 import { databaseUnavailableMessage, isPrismaDatabaseConnectivityError, isPrismaSchemaMissingError, schemaMissingMessage } from "@/lib/prisma-errors";
 
 function sanitizeDisplayName(input: unknown): string | null {
@@ -29,47 +30,6 @@ function sanitizeAvatarUrl(input: unknown): string | null {
   }
 }
 
-function shouldEnforceTurnstile(): boolean {
-  if (process.env.TURNSTILE_ENFORCE === "true") return true;
-  if (process.env.TURNSTILE_ENFORCE === "false") return false;
-  return process.env.NODE_ENV === "production";
-}
-
-async function verifyTurnstile(token?: string | null): Promise<boolean> {
-  if (!shouldEnforceTurnstile()) {
-    // In local/dev environments, allow auth flow to continue even if Turnstile is blocked.
-    return true;
-  }
-
-  if (!token) return false;
-
-  const secretKey = process.env.TURNSTILE_SECRET_KEY;
-  if (!secretKey) {
-    console.error("TURNSTILE_SECRET_KEY is missing.");
-    return false;
-  }
-
-  const formData = new URLSearchParams();
-  formData.append("secret", secretKey);
-  formData.append("response", token);
-
-  try {
-    const verifyRes = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-      method: "POST",
-      body: formData,
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    });
-
-    if (!verifyRes.ok) return false;
-
-    const verifyData = await verifyRes.json();
-    return Boolean(verifyData?.success);
-  } catch (error) {
-    console.error("Turnstile verification failed:", error);
-    return false;
-  }
-}
-
 export const authOptions: AuthOptions = {
   providers: [
     GoogleProvider({
@@ -87,7 +47,7 @@ export const authOptions: AuthOptions = {
         password: { label: "Password", type: "password" },
         turnstileToken: { label: "Turnstile Token", type: "text" }
       },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         const rawEmail = credentials?.email || "";
         const password = credentials?.password || "";
         const turnstileToken = credentials?.turnstileToken;
@@ -96,8 +56,14 @@ export const authOptions: AuthOptions = {
         if (!email || !password || !isValidEmail(email)) return null;
 
         // Rate Limiter: maximum of 5 attempts per 15 minutes per email to prevent vertical brute force
-        const isAllowed = await checkRateLimit(email, "login_attempt", 5, 15);
-        if (!isAllowed) {
+        const loginIp =
+          request?.headers?.get("x-vercel-forwarded-for")?.split(",")[0]?.trim() ||
+          request?.headers?.get("x-real-ip") ||
+          request?.headers?.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+          "unknown";
+        const emailAllowed = await checkRateLimit(email, "login_attempt_email", 5, 15);
+        const ipAllowed = await checkRateLimit(loginIp, "login_attempt_ip", 20, 15);
+        if (!emailAllowed || !ipAllowed) {
           throw new Error("Too many failed login attempts. Please try again later.");
         }
 
@@ -142,7 +108,7 @@ export const authOptions: AuthOptions = {
                 });
               }
 
-              await clearRateLimit(email, "login_attempt");
+              await clearRateLimit(email, "login_attempt_email");
               return { id: dbUser.id, email: dbUser.email, name: dbUser.name, image: dbUser.avatar };
             }
 
@@ -163,7 +129,7 @@ export const authOptions: AuthOptions = {
 
           if (hash !== verifyHash) return null;
 
-          await clearRateLimit(email, "login_attempt");
+          await clearRateLimit(email, "login_attempt_email");
           return {
             id: legacyUser.id,
             email: legacyUser.email,

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { getClientIp, isSameOrigin, isValidEmail, noStoreJson, normalizeEmail, validatePasswordStrength } from '@/lib/security';
 import { isSupabaseAuthConfigured, supabaseSignUpWithPassword } from '@/lib/supabase-auth';
+import { verifyTurnstile } from '@/lib/turnstile';
 import { databaseUnavailableMessage, isPrismaDatabaseConnectivityError, isPrismaSchemaMissingError, schemaMissingMessage } from '@/lib/prisma-errors';
 
 export async function POST(request: NextRequest) {
@@ -33,9 +34,14 @@ export async function POST(request: NextRequest) {
     }
 
     const identifier = `${getClientIp(request)}:${email}`;
-    const isAllowed = await checkRateLimit(identifier, 'register_attempt', 5, 15);
-    if (!isAllowed) {
+    const emailAllowed = await checkRateLimit(identifier, 'register_attempt', 5, 15);
+    const ipAllowed = await checkRateLimit(getClientIp(request), 'register_ip_attempt', 15, 15);
+    if (!emailAllowed || !ipAllowed) {
       return noStoreJson({ error: 'Too many registration attempts. Please try later.' }, { status: 429 });
+    }
+
+    if (!await verifyTurnstile(turnstileToken, request)) {
+      return noStoreJson({ error: 'CAPTCHA validation failed. Please try again.' }, { status: 403 });
     }
 
     const existingUser = await prisma.user.findUnique({
