@@ -1,6 +1,10 @@
 pipeline {
   agent any
 
+  tools {
+    nodejs 'node-20-lts'
+  }
+
   options {
     disableConcurrentBuilds()
     buildDiscarder(logRotator(numToKeepStr: '20'))
