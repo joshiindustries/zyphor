@@ -21,6 +21,9 @@ RUN npx prisma generate
 
 # Next.js telemetry is disabled
 ENV NEXT_TELEMETRY_DISABLED 1
+# Next.js evaluates route modules while building. This is build-only and is not
+# copied to the runtime image, which must receive the real DATABASE_URL.
+ENV DATABASE_URL=postgresql://ci:ci@127.0.0.1:5432/zyphor_ci
 
 RUN npm run build
 

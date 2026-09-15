@@ -20,6 +20,9 @@ pipeline {
   environment {
     NEXT_TELEMETRY_DISABLED = '1'
     CI = 'true'
+    // Route-module initialization requires a syntactically valid URL, but the CI
+    // build never connects to this database or applies migrations.
+    DATABASE_URL = 'postgresql://ci:ci@127.0.0.1:5432/zyphor_ci'
   }
 
   stages {
