@@ -23,20 +23,6 @@ export async function POST(request: NextRequest) {
       return noStoreJson({ success: false, error: 'Invalid request origin' }, { status: 403 });
     }
 
-    const formData = await request.formData();
-    
-    const files = formData.getAll('files') as File[];
-    if (files.length === 0) {
-      return noStoreJson({ success: false, error: 'At least one file is required.' }, { status: 400 });
-    }
-
-    if (files.length > 10) {
-      return noStoreJson({ success: false, error: 'You can upload up to 10 files per transfer.' }, { status: 400 });
-    }
-
-    const maxDownloadsRaw = parseInt(formData.get('maxDownloads') as string, 10);
-    const maxDownloads = Number.isFinite(maxDownloadsRaw) ? Math.max(0, Math.min(maxDownloadsRaw, 1000)) : 0;
-    
     // Enforce authentication: Guest uploads are strictly prohibited
     const user = await getUser();
     if (!user) {
@@ -48,6 +34,19 @@ export async function POST(request: NextRequest) {
     if (!uploadAllowed) {
       return noStoreJson({ success: false, error: 'Too many uploads. Please try again later.' }, { status: 429 });
     }
+
+    const formData = await request.formData();
+    const files = formData.getAll('files') as File[];
+    if (files.length === 0) {
+      return noStoreJson({ success: false, error: 'At least one file is required.' }, { status: 400 });
+    }
+
+    if (files.length > 10) {
+      return noStoreJson({ success: false, error: 'You can upload up to 10 files per transfer.' }, { status: 400 });
+    }
+
+    const maxDownloadsRaw = parseInt(formData.get('maxDownloads') as string, 10);
+    const maxDownloads = Number.isFinite(maxDownloadsRaw) ? Math.max(0, Math.min(maxDownloadsRaw, 1000)) : 0;
     
     const customLinkId = formData.get('customLinkId') as string | null;
     let linkId = '';

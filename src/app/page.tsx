@@ -12,6 +12,25 @@ import SiteFooter from "@/components/SiteFooter";
 // Define the available password modes
 type PasswordMode = "auto" | "random" | "memorable" | "custom" | "webrtc";
 type PreviewKind = "image" | "video" | "audio" | "pdf";
+const MAX_UPLOAD_FILE_BYTES = 50 * 1024 * 1024;
+
+async function readUploadResponse(response: Response): Promise<{ success?: boolean; error?: string; linkId?: string }> {
+  const responseText = await response.text();
+  let payload: { success?: boolean; error?: string; linkId?: string } | null = null;
+
+  try {
+    payload = responseText ? JSON.parse(responseText) : null;
+  } catch {
+    // A reverse proxy can reject a request before the API route has a chance to return JSON.
+  }
+
+  if (response.ok && payload) return payload;
+  if (payload?.error) throw new Error(payload.error);
+  if (response.status === 413) {
+    throw new Error("The upload is larger than the server's request limit. Please choose smaller files or ask the administrator to allow 512 MB requests.");
+  }
+  throw new Error(`Upload request failed (${response.status}). Please try again.`);
+}
 
 function getPreviewKind(file: File): PreviewKind | null {
   const mime = file.type || "";
@@ -91,12 +110,26 @@ export default function Home() {
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      setFiles(Array.from(e.target.files));
+      const selectedFiles = Array.from(e.target.files);
+      const oversizedFile = selectedFiles.find((file) => file.size > MAX_UPLOAD_FILE_BYTES);
+      if (oversizedFile) {
+        alert(`File exceeds the 50 MB limit: ${oversizedFile.name}`);
+        e.target.value = "";
+        return;
+      }
+      if (selectedFiles.length > 10) {
+        alert("You can upload up to 10 files per transfer.");
+        e.target.value = "";
+        return;
+      }
+      setFiles(selectedFiles);
     }
   };
 
   const startWebrtcSession = async () => {
     if (files.length === 0) return alert("Files are required.");
+    const oversizedFile = files.find((file) => file.size > MAX_UPLOAD_FILE_BYTES);
+    if (oversizedFile) return alert(`File exceeds the 50 MB limit: ${oversizedFile.name}`);
     
     // 1. Generate a unique channel ID
     const channelId = Math.random().toString(36).substring(2, 15);
@@ -333,8 +366,8 @@ export default function Home() {
         body: formData,
       });
 
-      const data = await res.json();
-      if (data.success) {
+      const data = await readUploadResponse(res);
+      if (data.success && data.linkId) {
         const linkDetail = `${window.location.origin}/${data.linkId}`;
         setShareLink(shouldEmbedInLink ? `${linkDetail}#${encryptionKey}` : linkDetail);
         
@@ -355,7 +388,7 @@ export default function Home() {
         }
         setProgress(100);
       } else {
-        throw new Error(data.error);
+        throw new Error(data.error || "Upload failed. Please try again.");
       }
     } catch (err) {
       console.error(err);
