@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../lib/api.js";
 
-const TASKS_VERSION = "0.10.22";
+const TASKS_VERSION = "0.10.22-rc.20250304";
 const MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
 
 /** Local face-count signal only. No frames or identity data are sent to Zyphor. */
