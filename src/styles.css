@@ -626,6 +626,10 @@ body.no-select .cm-editor, body.no-select input, body.no-select textarea { -webk
 @keyframes pulse { 50% { opacity: .55; } }
 
 .exam-body { display: grid; grid-template-columns: 262px 1fr; min-height: 0; }
+.exam-camera-monitor { display: flex; gap: 9px; align-items: center; width: fit-content; max-width: min(100%, 560px); margin: 5px 0; padding: 6px 9px; }
+.exam-camera-monitor video { flex: 0 0 72px; width: 72px; height: 50px; object-fit: cover; border-radius: 6px; background: #111; }
+.exam-camera-monitor__text { min-width: 0; font-size: 12px; line-height: 1.35; }
+.exam-camera-monitor__text .small { font-size: 10.5px; }
 .palette { border-right: 1px solid var(--border); background: var(--surface); overflow-y: auto; padding: 14px; }
 .palette h4 { font-size: 10.5px; color: var(--faint); text-transform: uppercase; margin: 15px 0 7px; letter-spacing: .07em; font-weight: 700; }
 .palette > div:first-child > h4 { margin-top: 0; }

@@ -5,10 +5,12 @@ const TASKS_VERSION = "0.10.22-rc.20250304";
 const MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
 
 /** Local face-count signal only. No frames or identity data are sent to Zyphor. */
-export default function MediaPipeMonitor({ attemptId, session, policy = {} }) {
+export default function MediaPipeMonitor({ attemptId, session, policy = {}, onMultipleFaces }) {
   const video = useRef(null);
   const stream = useRef(null);
   const landmarker = useRef(null);
+  const onMultipleFacesRef = useRef(onMultipleFaces);
+  onMultipleFacesRef.current = onMultipleFaces;
   const sentAt = useRef({});
   const alertCount = useRef(0);
   const [state, setState] = useState("Requesting camera…");
@@ -46,7 +48,8 @@ export default function MediaPipeMonitor({ attemptId, session, policy = {} }) {
         const files = await vision.FilesetResolver.forVisionTasks(`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${TASKS_VERSION}/wasm`);
         landmarker.current = await vision.FaceLandmarker.createFromOptions(files, {
           baseOptions: { modelAssetPath: MODEL_URL, delegate: "CPU" },
-          runningMode: "VIDEO", numFaces: 2,
+          // Detect a third face so the >2 policy can actually trigger.
+          runningMode: "VIDEO", numFaces: 3,
           minFaceDetectionConfidence: 0.55, minFacePresenceConfidence: 0.55,
         });
         if (!live || !monitoringEnabled) { landmarker.current.close?.(); landmarker.current = null; stream.current?.getTracks().forEach((track) => track.stop()); return; }
@@ -78,9 +81,12 @@ export default function MediaPipeMonitor({ attemptId, session, policy = {} }) {
                 if (now - multiFaceSince >= (policy.multi_face_seconds || 3) * 1000) {
                   if (report("multiple_faces", { face_count: count })) {
                     alertCount.current += 1;
-                    setState(alertCount.current >= (policy.warning_limit || 3)
-                      ? "Repeated face-visibility alerts · please check the camera view"
-                      : "Multiple faces detected · alert recorded for review");
+                    if (count > 2) {
+                      onMultipleFacesRef.current?.(count);
+                      setState("More than two faces detected · violation recorded");
+                    } else {
+                      setState("Multiple faces detected · alert recorded for review");
+                    }
                   }
                 }
               } else multiFaceSince = 0;
@@ -144,9 +150,9 @@ export default function MediaPipeMonitor({ attemptId, session, policy = {} }) {
     };
   }, [attemptId, session, policy]);
 
-  return <aside className="card pad-sm" aria-live="polite" style={{ display: "flex", gap: 12, alignItems: "center", margin: "8px 0" }}>
-    <video ref={video} muted playsInline aria-label="Local camera preview" style={{ width: 112, height: 78, objectFit: "cover", borderRadius: 8, background: "#111" }} />
-    <div><strong>{state}</strong><div className="small muted">Face detection runs locally. No video is recorded or uploaded. Alerts are unverified signals for review.</div>
+  return <aside className="card pad-sm exam-camera-monitor" aria-live="polite">
+    <video ref={video} muted playsInline aria-label="Local camera preview" />
+    <div className="exam-camera-monitor__text"><strong>{state}</strong><div className="small muted">Local face detection only · no video recorded or uploaded.</div>
       {faceCount !== null && <div className="small">Detected faces: {faceCount}</div>}
     </div>
   </aside>;
