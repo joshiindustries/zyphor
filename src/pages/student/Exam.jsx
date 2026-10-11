@@ -507,7 +507,7 @@ export default function Exam() {
               : <li>There is no negative marking.</li>}
             <li>Answers are saved automatically as you go.{i.has_coding && <> For coding questions, use <strong>Submit code</strong> to score against hidden test cases; unsubmitted code is graded when the exam ends.</>}</li>
             <li>Every action is logged and reviewed by the exam organizers.</li>
-            {i.mediapipe_enabled && <li><strong>Camera monitoring:</strong> Zyphor detects faces locally; no video or facial identity is recorded or uploaded. Sustained detection of more than two faces counts as a violation, and reaching the violation limit submits the exam automatically. Face detection can be inaccurate, so camera alerts should be reviewed by the organizers. See the <a href={i.mediapipe_policy?.privacy_policy_url} target="_blank" rel="noreferrer">event privacy policy</a>. If you need a camera accommodation, contact the organizer before starting.</li>}
+            {i.mediapipe_enabled && <li><strong>Camera monitoring:</strong> Zyphor detects faces locally; no video or facial identity is recorded or uploaded. Sustained detection of more than one face counts as a violation and submits the exam automatically. Face detection can be inaccurate, so camera alerts should be reviewed by the organizers. See the <a href={i.mediapipe_policy?.privacy_policy_url} target="_blank" rel="noreferrer">event privacy policy</a>. If you need a camera accommodation, contact the organizer before starting.</li>}
           </ul>
         </div>
 

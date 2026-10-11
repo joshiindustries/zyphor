@@ -48,8 +48,8 @@ export default function MediaPipeMonitor({ attemptId, session, policy = {}, onMu
         const files = await vision.FilesetResolver.forVisionTasks(`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${TASKS_VERSION}/wasm`);
         landmarker.current = await vision.FaceLandmarker.createFromOptions(files, {
           baseOptions: { modelAssetPath: MODEL_URL, delegate: "CPU" },
-          // Detect a third face so the >2 policy can actually trigger.
-          runningMode: "VIDEO", numFaces: 3,
+          // Detect a second face so the >1 policy can trigger.
+          runningMode: "VIDEO", numFaces: 2,
           minFaceDetectionConfidence: 0.55, minFacePresenceConfidence: 0.55,
         });
         if (!live || !monitoringEnabled) { landmarker.current.close?.(); landmarker.current = null; stream.current?.getTracks().forEach((track) => track.stop()); return; }
@@ -81,11 +81,9 @@ export default function MediaPipeMonitor({ attemptId, session, policy = {}, onMu
                 if (now - multiFaceSince >= (policy.multi_face_seconds || 3) * 1000) {
                   if (report("multiple_faces", { face_count: count })) {
                     alertCount.current += 1;
-                    if (count > 2) {
+                    if (count > 1) {
                       onMultipleFacesRef.current?.(count);
-                      setState("More than two faces detected · violation recorded");
-                    } else {
-                      setState("Multiple faces detected · alert recorded for review");
+                      setState("More than one face detected · violation recorded");
                     }
                   }
                 }
