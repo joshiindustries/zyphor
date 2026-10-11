@@ -5,12 +5,14 @@ const TASKS_VERSION = "0.10.22-rc.20250304";
 const MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
 
 /** Local face-count signal only. No frames or identity data are sent to Zyphor. */
-export default function MediaPipeMonitor({ attemptId, session, policy = {}, onMultipleFaces }) {
+export default function MediaPipeMonitor({ attemptId, session, policy = {}, onMultipleFaces, onBlocked }) {
   const video = useRef(null);
   const stream = useRef(null);
   const landmarker = useRef(null);
   const onMultipleFacesRef = useRef(onMultipleFaces);
   onMultipleFacesRef.current = onMultipleFaces;
+  const onBlockedRef = useRef(onBlocked);
+  onBlockedRef.current = onBlocked;
   const sentAt = useRef({});
   const alertCount = useRef(0);
   const [state, setState] = useState("Requesting camera…");
@@ -30,11 +32,13 @@ export default function MediaPipeMonitor({ attemptId, session, policy = {}, onMu
       if (now - (sentAt.current[type] || 0) < 5000) return false;
       sentAt.current[type] = now;
       api("POST", `/api/zyphor/integrations/attempts/${attemptId}/monitoring`, { type, details }, headers)
+        .then((result) => { if (result.auto_submitted) onBlockedRef.current?.(type); })
         .catch(() => {});
       return true;
     };
 
     async function start() {
+      let cameraStarted = false;
       try {
         const granted = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
         if (!live || !monitoringEnabled) { granted.getTracks().forEach((track) => track.stop()); return; }
@@ -42,6 +46,7 @@ export default function MediaPipeMonitor({ attemptId, session, policy = {}, onMu
         video.current.srcObject = stream.current;
         stream.current.getVideoTracks().forEach((track) => track.addEventListener("ended", interrupted));
         await video.current.play();
+        cameraStarted = true;
         setState("Camera ready · initializing local face monitoring");
         const vision = await import(/* @vite-ignore */ `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${TASKS_VERSION}/vision_bundle.mjs`);
         if (!live || !monitoringEnabled) { stream.current?.getTracks().forEach((track) => track.stop()); return; }
@@ -107,15 +112,16 @@ export default function MediaPipeMonitor({ attemptId, session, policy = {}, onMu
         landmarker.current = null;
         stream.current?.getTracks().forEach((track) => track.stop());
         const denied = error?.name === "NotAllowedError" || error?.name === "PermissionDeniedError";
-        setState(denied ? "Camera permission was denied" : "Camera or monitoring service unavailable");
-        report(denied ? "camera_denied" : "camera_interrupted", { camera_state: denied ? "denied" : "unavailable" });
+        const eventType = denied ? "camera_denied" : cameraStarted ? "model_error" : "camera_interrupted";
+        setState(denied ? "Camera permission was denied" : cameraStarted ? "Face monitoring failed" : "Camera unavailable");
+        report(eventType, { camera_state: denied ? "denied" : "unavailable", error: String(error?.message || "Camera startup failed").slice(0, 160) });
       }
     }
     start();
     const switchPoll = setInterval(async () => {
       try {
         const current = await api("GET", `/api/zyphor/integrations/attempts/${attemptId}/status`);
-        if (current.mediapipe_enabled && monitoringEnabled && stream.current?.active && Date.now() - lastCameraStatus >= 60000) {
+        if (current.mediapipe_enabled && monitoringEnabled && stream.current?.active && Date.now() - lastCameraStatus >= 15000) {
           if (report("camera_ready", { camera_state: "ready" })) lastCameraStatus = Date.now();
         }
         if (!current.mediapipe_enabled && monitoringEnabled) {
