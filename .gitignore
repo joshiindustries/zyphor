@@ -1,19 +1,8 @@
-# dependencies/build
+.vercel
+.env*
+!.env.example
+
+# Dependencies and generated build output
 node_modules/
-.next/
 dist/
-.dist/
-
-# local runtime data
-uploads/
-
-# environment/secrets
-.env
-.env.local
-.env.*.local
-
-# logs
-*.log
-
-# misc
-tsconfig.tsbuildinfo
+.vercel/
