@@ -5,6 +5,7 @@ import {
   Badge, Field, Loading, Markdown, Modal, ModalButton, useConfirm, useToast,
 } from "../../components/ui.jsx";
 import { Stat } from "./context.jsx";
+import { VIOLATION_TEXT } from "../student/examState.js";
 
 export const REASON_TEXT = {
   time_up: "Time ran out",
@@ -149,7 +150,7 @@ export default function AttemptDetail({ attemptId, cq, onClose, onChanged }) {
                 ) : a.events.map((e, i) => (
                   <tr key={i}>
                     <td className="small">{fmtDate(e.at)}</td>
-                    <td>{e.counted ? <Badge color="red">{e.type}</Badge> : e.type}</td>
+                    <td>{e.counted ? <Badge color="red">{VIOLATION_TEXT[e.type] || e.type}</Badge> : (VIOLATION_TEXT[e.type] || e.type)}</td>
                     <td className="small">{e.details || ""}</td>
                   </tr>
                 ))}

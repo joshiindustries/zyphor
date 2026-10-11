@@ -5,6 +5,7 @@ import { fmtDuration } from "../../lib/format.js";
 import { Badge, Field, Loading, Modal, ModalButton, Progress, useToast } from "../../components/ui.jsx";
 import { Stat, useAdmin, windowBadgeProps } from "./context.jsx";
 import AttemptDetail from "./AttemptDetail.jsx";
+import { VIOLATION_TEXT } from "../student/examState.js";
 
 const REFRESH_MS = 10000;
 
@@ -174,7 +175,7 @@ export default function Live() {
                   </td>
                   <td className="small">
                     {a.last_event && (
-                      <>{a.last_event.type}<br />{new Date(a.last_event.at).toLocaleTimeString()}</>
+                      <>{VIOLATION_TEXT[a.last_event.type] || a.last_event.type}<br />{new Date(a.last_event.at).toLocaleTimeString()}</>
                     )}
                   </td>
                   <td>
@@ -195,7 +196,7 @@ export default function Live() {
               <strong className="small">{v.name}</strong>{" "}
               <span className="muted small">{v.roll_no}</span>
               <div className="small">
-                <Badge color="red">{v.type}</Badge> {new Date(v.at).toLocaleTimeString()}
+                <Badge color="red">{VIOLATION_TEXT[v.type] || v.type}</Badge> {new Date(v.at).toLocaleTimeString()}
               </div>
             </div>
           ))}

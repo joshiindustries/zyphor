@@ -25,6 +25,12 @@ export const VIOLATION_TEXT = {
   devtools_open: "Developer tools are not allowed",
   keyboard_shortcut: "That keyboard shortcut is blocked",
   print_screen: "Screenshots are not allowed",
+  multiple_faces: "More than one face was detected",
+  camera_denied: "Camera access was denied",
+  camera_interrupted: "Camera monitoring was interrupted",
+  model_error: "Camera face monitoring failed",
+  no_face: "No face was visible to camera monitoring",
+  face_missing: "Camera face monitoring could not verify a face",
 };
 
 export function isFullscreen() {
