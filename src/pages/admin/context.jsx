@@ -13,6 +13,7 @@ export const orgNoun = (org) => (org?.org_type === "event" ? "event" : "college"
 export const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export const ICONS = {
+  moodle: '<path d="M3 4h6c1 0 1 1 1 1s0-1 1-1h6v12h-6c-1 0-1 1-1 1s0-1-1-1H3V4Z"/><path d="M10 5v12"/>',
   overview: '<path d="M3 9.5 10 4l7 5.5V16a1 1 0 0 1-1 1h-3v-5H7v5H4a1 1 0 0 1-1-1V9.5Z"/>',
   colleges: '<path d="M10 3 3 6.5 10 10l7-3.5L10 3Z"/><path d="M4.5 9v4.5c0 1 2.5 2.5 5.5 2.5s5.5-1.5 5.5-2.5V9"/>',
   students: '<circle cx="7.5" cy="7" r="2.6"/><path d="M3 16c0-2.5 2-4.2 4.5-4.2S12 13.5 12 16"/><circle cx="14.5" cy="8" r="2"/><path d="M13 16c0-1.9 1-3.1 2.6-3.1 1.1 0 1.9.5 2.4 1.3"/>',

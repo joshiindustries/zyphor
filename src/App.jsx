@@ -13,6 +13,7 @@ import CoordinatorDashboard from "./pages/coordinator/CoordinatorDashboard.jsx";
 import { PublicSkillPassport } from "./pages/student/SkillPassport.jsx";
 import AccessibilitySettings from "./components/AccessibilitySettings.jsx";
 import CertificateVerification from "./pages/student/CertificateVerification.jsx";
+import MoodlePortal, { LtiLaunch } from "./pages/MoodlePortal.jsx";
 
 // The code editor is most of the bundle, and only the exam page needs it.
 // A tab opened before a new deploy asks for a chunk that no longer exists; reload once to pick up
@@ -42,6 +43,8 @@ function PrivateApp() {
           <Routes>
             <Route path="/passport/:token" element={<PublicSkillPassport />} />
             <Route path="/certificates/:token" element={<CertificateVerification />} />
+            <Route path="/lti/launch" element={<LtiLaunch />} />
+            <Route path="/moodle" element={<RequireRole roles={["super_admin", "college_admin", "coordinator", "student"]}><MoodlePortal /></RequireRole>} />
             <Route path="/" element={<Root />} />
             <Route path="/login" element={<Login />} />
             <Route

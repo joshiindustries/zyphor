@@ -120,7 +120,7 @@ export async function api(method, path, body, opts = {}) {
   if (text) { try { data = JSON.parse(text); } catch { data = { detail: text }; } }
 
   if (!res.ok) {
-    if (res.status === 401 && !opts.noRedirect && !path.includes("/auth/login")) {
+    if (res.status === 401 && token === auth.token() && !opts.noRedirect && !path.includes("/auth/login")) {
       auth.clear();
       if (onUnauthorized.handler) onUnauthorized.handler();
     }

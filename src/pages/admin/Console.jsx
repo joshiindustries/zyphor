@@ -25,6 +25,7 @@ import CoordinatorPortal from "./CoordinatorPortal.jsx";
 import EvaluationSheetAdmin from "./EvaluationSheetAdmin.jsx";
 import CoordinatorManagement from "./CoordinatorManagement.jsx";
 import Templates from "./Templates.jsx";
+import { MoodleWorkspace } from "../MoodlePortal.jsx";
 
 export default function Console() {
   const { user, logout } = useAuth();
@@ -105,6 +106,7 @@ export default function Console() {
     { id: "overview", to: "/console", end: true, label: "Overview" },
     ...(isSuper ? [{ id: "colleges", to: "/console/colleges", label: "Colleges & Events" }, { id: "coordinators", to: "/console/coordinators", label: "Coordinator access" }, { id: "usage", to: "/console/usage", label: "Usage" }] : []),
     { id: "integrations", to: "/console/integrations", label: "Integrations" },
+    { id: "moodle", to: "/console/moodle", label: "Moodle Learning Hub" },
     { group: isSuper ? "Selected college / event" : org?.org_type === "event" ? "Event" : "College" },
     { id: "students", to: "/console/students", label: "Students" },
     { id: "exams", to: "/console/exams", label: "Exams & Results" },
@@ -210,6 +212,7 @@ export default function Console() {
               <Route path="exams/:examId/preview" element={<Scoped><Preview /></Scoped>} />
               <Route path="usage" element={isSuper ? <Usage /> : <Navigate to="/console" replace />} />
               <Route path="integrations" element={<Integrations />} />
+              <Route path="moodle" element={<Scoped><MoodleWorkspace collegeId={collegeId} /></Scoped>} />
               <Route path="leaderboard" element={<Scoped><Leaderboard /></Scoped>} />
               <Route path="announcements" element={<Announcements />} />
               <Route path="account" element={<Account />} />

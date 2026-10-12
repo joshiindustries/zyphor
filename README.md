@@ -32,4 +32,12 @@ Passing released results in the Skill Passport provide private certificate PDFs 
 
 The Aa menu includes low-bandwidth mode. It reduces optional health checks from every 20 seconds to every minute and minimizes animation. Autosave, exam heartbeat, camera monitoring and manual rechecks continue normally.
 
+## Moodle Learning Hub
+
+Student and Coordinator dashboards include **Moodle Learning Hub**; Admin and Superadmin use the organization's Learning Hub in the console. A Superadmin links published Moodle courses, then event admins assign enrolled students and link Zyphor assessments. **Open Moodle course** uses signed LTI 1.3 SSO without sharing the Zyphor password. The browser must allow the course window.
+
+Moodle assessment links return to `/lti/launch` using a short-lived, single-use handoff. Backend checks bind the real identity, course, exam and session; Moodle claims cannot promote a user's Zyphor role. Released marks synchronize through LTI Advantage AGS, with retry controls in the hub. Moodle grades use a 0–100 scale and appear separately from original Zyphor marks/reports. Unreleased or recalled results remain protected on the backend.
+
+Deploy the matching laptop backend and Moodle connector before this frontend. Managed laptop startup refreshes the tunnel, Moodle registrations and `public/backend.json`. Private keys and connector credentials remain on the laptop. Quick Tunnel URLs are temporary; restarting the laptop does not provide continuous service while it is offline.
+
 Deploy the matching backend before publishing these frontend features. A successful frontend build does not prove compiler execution, camera detection, Moodle integration, or 300-participant capacity. Those live checks are tracked in the laptop repository's `docs/feature-upgrade-status.md`.

@@ -15,9 +15,11 @@ export function AuthProvider({ children }) {
   // A real 401 still bounces to the sign-in screen via the usual handler below; anything else
   // (offline, a slow server) just leaves the cached profile in place.
   useEffect(() => {
-    if (!store.token()) return;
-    api("GET", "/api/zyphor/auth/me").then((me) => {
-      store.save(store.token(), me);
+    const loadedToken = store.token();
+    if (!loadedToken) return;
+    api("GET", "/api/zyphor/auth/me", null, { noRedirect: window.location.pathname === "/lti/launch" }).then((me) => {
+      if (store.token() !== loadedToken) return;
+      store.save(loadedToken, me);
       setUser(me);
     }).catch(() => {});
   }, []);

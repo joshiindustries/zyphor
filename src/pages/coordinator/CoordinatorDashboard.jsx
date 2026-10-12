@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "../../lib/api.js";
 import { useAuth } from "../../lib/auth.jsx";
 import { Badge, Brand, Loading, ThemeToggle, useToast } from "../../components/ui.jsx";
+import { Link } from "react-router-dom";
 
 const time = (value) => value ? new Date(value).toLocaleString() : "—";
 
@@ -58,7 +59,7 @@ export default function CoordinatorDashboard() {
   const attention = sessions.filter((row) => row.camera_status === "interrupted" || row.status_stale).length;
   const matches = (row) => `${row.participant_name || ""} ${row.roll_no || ""}`.toLowerCase().includes(filter.toLowerCase());
   return <div className="shell">
-    <aside className="sidebar"><Brand sub="Event Coordinator" /><div className="sidebar-foot">
+    <aside className="sidebar"><Brand sub="Event Coordinator" /><Link className="btn" to="/moodle">Moodle Learning Hub</Link><div className="sidebar-foot">
       <div className="row between"><span className="tiny faint">{user.name}</span><div className="row tight"><ThemeToggle /><button className="btn ghost sm" onClick={logout}>Sign out</button></div></div>
     </div></aside>
     <main className="main">
