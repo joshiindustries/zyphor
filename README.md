@@ -6,6 +6,8 @@ React 18 + Vite single-page app. The public homepage is static and rendered with
 
 From the repository root, start the backend first, then:
 
+Use Node.js 22.12 or newer (the laptop verification used Node 24). The lockfile includes a gRPC 1.x security patch override for Firebase's transitive dependency; Firebase sign-in remains optional and is not enabled by updating the SDK.
+
 ```powershell
 Set-Location frontend
 npm ci
