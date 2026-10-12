@@ -9,6 +9,7 @@ import ChangePassword from "./ChangePassword.jsx";
 import ResultModal from "./ResultModal.jsx";
 import LeaderboardModal from "./LeaderboardModal.jsx";
 import EvaluationSheetModal from "./EvaluationSheetModal.jsx";
+import SkillPassport from "./SkillPassport.jsx";
 
 const ORDER = { in_progress: 0, live: 1, paused: 2, upcoming: 3, completed: 4, missed: 5 };
 
@@ -91,6 +92,7 @@ export default function Dashboard() {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [showPwd, setShowPwd] = useState(false);
+  const [showPassport, setShowPassport] = useState(false);
   const [result, setResult] = useState(null);
   const [boardExam, setBoardExam] = useState(null);
   const [evaluation, setEvaluation] = useState(null);
@@ -157,12 +159,14 @@ export default function Dashboard() {
             {user?.name} · {isEvent ? "Team ID" : "Roll no"} <strong>{user?.roll_no}</strong>
             {user?.college && <> · {isEvent ? "Event" : "College"} code <strong>{user.college.code}</strong></>}
           </span>
+          <button className="btn sm" onClick={() => setShowPassport(true)}>Skill Passport</button>
           <button className="btn sm" onClick={() => setShowPwd(true)}>Change password</button>
           <ThemeToggle className="btn ghost sm" />
           <button className="btn sm" onClick={logout}>Sign out</button>
         </div>
       </header>
 
+      {showPassport && <SkillPassport onClose={() => setShowPassport(false)} />}
       {error && <ErrorState message={error} onRetry={load} />}
       {!data && !error && <Loading />}
 

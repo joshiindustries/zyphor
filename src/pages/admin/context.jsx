@@ -31,7 +31,7 @@ export function NavIcon({ id }) {
   return (
     <svg className="ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"
          strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
-         dangerouslySetInnerHTML={{ __html: ICONS[id] || "" }} />
+         dangerouslySetInnerHTML={{ __html: ICONS[id === "templates" ? "exams" : id] || "" }} />
   );
 }
 

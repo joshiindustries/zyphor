@@ -6,6 +6,7 @@ import {
 import { nullIfBlank, useAdmin } from "./context.jsx";
 import { Pager } from "./shared.jsx";
 import QuestionImport from "./QuestionImport.jsx";
+import QuestionHistory from "./QuestionHistory.jsx";
 
 const PAGE_SIZE = 50;
 const LETTER = (i) => String.fromCharCode(65 + i);
@@ -236,6 +237,7 @@ function McqForm({ meta, initial, readOnly, defaultSection, onClose, onSaved }) 
         </>
       )}
     >
+      {q.id && !readOnly && <QuestionHistory kind="mcq" questionId={q.id} />}
       <fieldset disabled={readOnly} style={{ border: 0, padding: 0, margin: 0 }}>
         <div className="form-grid">
           <Field label="Section *">

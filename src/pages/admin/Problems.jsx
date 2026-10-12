@@ -5,6 +5,7 @@ import {
   Badge, Field, Loading, Modal, ModalButton, Spinner, useConfirm, useToast,
 } from "../../components/ui.jsx";
 import { nullIfBlank, useAdmin } from "./context.jsx";
+import QuestionHistory from "./QuestionHistory.jsx";
 
 export default function Problems() {
   const { isSuper } = useAdmin();
@@ -211,6 +212,7 @@ function ProblemForm({ meta, initial, onClose, onSaved }) {
       }
     >
       <div className="form-grid">
+        {p.id && <QuestionHistory kind="coding" questionId={p.id} />}
         <Field label="Title *"><input value={f.title} onChange={set("title")} /></Field>
         <Field label="Difficulty">
           <select value={f.difficulty} onChange={set("difficulty")}>

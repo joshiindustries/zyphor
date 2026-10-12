@@ -900,3 +900,11 @@ tbody tr:hover { background: var(--surface-2); }
 .connection-details dt { color: var(--muted); }
 .connection-details dd { margin: 0; }
 .connection-details p { color: var(--warning); }
+/* Persistent keyboard-accessible reading preferences. */
+.accessibility-settings { position: fixed; right: 12px; bottom: 12px; z-index: 50; }
+.accessibility-settings > summary { cursor: pointer; background: var(--surface, #fff); color: var(--text, #101827); border: 1px solid var(--border); border-radius: 10px; padding: 7px 12px; font-weight: 700; }
+.accessibility-settings > div { width: 230px; margin-top: 8px; box-shadow: 0 8px 24px #0002; }
+.high-contrast { --muted: #334155; --faint: #475569; --border: #64748b; }
+.high-contrast[data-theme="dark"] { --muted: #e2e8f0; --faint: #cbd5e1; --border: #94a3b8; }
+@media (prefers-color-scheme: dark) { :root.high-contrast:not([data-theme="light"]) { --muted: #e2e8f0; --faint: #cbd5e1; --border: #94a3b8; } }
+:focus-visible { outline: 3px solid var(--primary, #2563eb); outline-offset: 3px; }

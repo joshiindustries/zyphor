@@ -1,5 +1,6 @@
 import { Badge, Markdown, Modal, Progress, useToast } from "../../components/ui.jsx";
 import { download } from "../../lib/api.js";
+import QuestionChallenges from "./QuestionChallenges.jsx";
 
 const REASONS = {
   time_up: "Submitted automatically when time ran out.",
@@ -110,6 +111,7 @@ export default function ResultModal({ result: r, onClose }) {
           )}
         </>
       )}
+      <QuestionChallenges attemptId={r.attempt_id} />
     </Modal>
   );
 }

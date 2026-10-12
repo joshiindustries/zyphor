@@ -24,6 +24,7 @@ import Integrations from "./Integrations.jsx";
 import CoordinatorPortal from "./CoordinatorPortal.jsx";
 import EvaluationSheetAdmin from "./EvaluationSheetAdmin.jsx";
 import CoordinatorManagement from "./CoordinatorManagement.jsx";
+import Templates from "./Templates.jsx";
 
 export default function Console() {
   const { user, logout } = useAuth();
@@ -107,6 +108,7 @@ export default function Console() {
     { group: isSuper ? "Selected college / event" : org?.org_type === "event" ? "Event" : "College" },
     { id: "students", to: "/console/students", label: "Students" },
     { id: "exams", to: "/console/exams", label: "Exams & Results" },
+    { id: "templates", to: "/console/templates", label: "Templates" },
     { id: "live", to: "/console/live", label: "Live Monitor" },
     { id: "coordinator", to: "/console/coordinator", label: "Coordinator Portal" },
     { id: "leaderboard", to: "/console/leaderboard", label: "Leaderboard" },
@@ -198,6 +200,7 @@ export default function Console() {
               <Route path="mcqs" element={<Mcqs />} />
               <Route path="problems" element={<Problems />} />
               <Route path="exams" element={<Scoped><Exams /></Scoped>} />
+              <Route path="templates" element={<Scoped><Templates /></Scoped>} />
               <Route path="exams/:examId" element={<Scoped><ExamBuilder /></Scoped>} />
               <Route path="exams/:examId/evaluation" element={<Scoped><EvaluationSheetAdmin /></Scoped>} />
               <Route path="exams/:examId/results" element={<Scoped><Results /></Scoped>} />

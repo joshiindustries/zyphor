@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { markdownToHtml } from "../lib/format.js";
 import { apiUrl } from "../lib/api.js";
@@ -101,8 +101,27 @@ export function ToastHost({ children }) {
 /* ── Modal ─────────────────────────────────────────────────────────── */
 export function Modal({ title, children, actions, onClose, wide, narrow, closable = true }) {
   const backdrop = useRef(null);
+  const dialog = useRef(null);
+  const titleId = useId();
   useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape" && closable) onClose?.(); };
+    const previous = document.activeElement;
+    dialog.current?.focus();
+    return () => { if (previous?.isConnected) previous.focus?.(); };
+  }, []);
+  useEffect(() => {
+    const onKey = (e) => {
+      // Only the topmost dialog handles keys when confirmations are nested.
+      const dialogs = document.querySelectorAll('[role="dialog"]');
+      if (dialogs[dialogs.length - 1] !== dialog.current) return;
+      if (e.key === "Escape" && closable) { e.preventDefault(); onClose?.(); }
+      if (e.key !== "Tab") return;
+      const nodes = [...dialog.current.querySelectorAll('button, a[href], input, select, textarea, [tabindex="0"]')]
+        .filter(n => !n.disabled && n.getClientRects().length);
+      const first = nodes[0], last = nodes[nodes.length - 1];
+      if (!first) { e.preventDefault(); dialog.current.focus(); }
+      else if (e.shiftKey && (document.activeElement === first || document.activeElement === dialog.current)) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && (document.activeElement === last || document.activeElement === dialog.current)) { e.preventDefault(); first.focus(); }
+    };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose, closable]);
@@ -113,9 +132,9 @@ export function Modal({ title, children, actions, onClose, wide, narrow, closabl
       ref={backdrop}
       onMouseDown={(e) => { if (closable && e.target === backdrop.current) onClose?.(); }}
     >
-      <div className={`modal${wide ? " wide" : ""}${narrow ? " narrow" : ""}`} role="dialog" aria-modal="true">
+      <div ref={dialog} tabIndex={-1} className={`modal${wide ? " wide" : ""}${narrow ? " narrow" : ""}`} role="dialog" aria-modal="true" aria-labelledby={titleId}>
         <div className="modal-head">
-          <h2>{title}</h2>
+          <h2 id={titleId}>{title}</h2>
           {closable && (
             <button className="btn ghost sm" onClick={onClose} aria-label="Close">✕</button>
           )}

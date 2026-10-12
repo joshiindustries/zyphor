@@ -8,6 +8,8 @@ import {
 import { useAdmin, windowBadgeProps } from "./context.jsx";
 import ExamSettings, { EXAM_TYPES } from "./ExamSettings.jsx";
 import ExamSets from "./ExamSets.jsx";
+import Accommodations from "./Accommodations.jsx";
+import { SaveTemplate } from "./Templates.jsx";
 
 export default function ExamBuilder() {
   const { examId } = useParams();
@@ -170,6 +172,8 @@ export default function ExamBuilder() {
         </div>
       </div>
 
+      <Accommodations examId={examId} />
+      <SaveTemplate examId={examId} />
       <div className="card">
         <dl className="kv">
           <dt>Type</dt><dd>{typeLabel}{exam.set_count ? ` · ${exam.set_count} sets` : ""}</dd>
