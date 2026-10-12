@@ -3,8 +3,9 @@ import { useParams } from "react-router-dom";
 import { api } from "../../lib/api.js";
 import { Badge, Loading, Modal, Progress, useToast } from "../../components/ui.jsx";
 import LearningAssistant from "./LearningAssistant.jsx";
+import { CertificateActions } from "./CertificateVerification.jsx";
 
-function Profile({ data }) {
+function Profile({ data, own = false }) {
   return <>
     <p className="muted">{data.verification}</p>
     <h3>{data.name}</h3>
@@ -14,6 +15,7 @@ function Profile({ data }) {
     {data.results.map(r => <article className="card pad-sm" key={r.attempt_id} style={{ marginBottom: 8 }}>
       <strong>{r.exam}</strong> <Badge color={r.passed ? "green" : "amber"}>{r.passed ? "Passed" : "Completed"}</Badge>
       <p>{r.score} / {r.maximum} · {r.percentage}% · {new Date(r.completed_at).toLocaleDateString()}</p>
+      {own && r.certificate_available && <CertificateActions attemptId={r.attempt_id} />}
     </article>)}
     <h3>Topic performance</h3>
     {data.topics.map(t => <div key={t.topic} className="section-bar"><strong>{t.topic}</strong><Progress value={Math.max(0, t.score)} max={t.maximum} /><span>{t.percentage}% · {t.questions} questions</span></div>)}
@@ -42,7 +44,7 @@ export default function SkillPassport({ onClose }) {
   }
   return <Modal title="Zyphor Skill Passport" wide onClose={onClose}>
     {error ? <p role="alert">{error} <button className="btn" onClick={load}>Retry</button></p> : !data ? <Loading /> : <>
-      <Profile data={data} />
+      <Profile data={data} own />
       {!!data.results.length && <LearningAssistant />}
       <h3>Student-controlled sharing</h3>
       <p className="small muted">Anyone with your link can view your name and released assessment results for 30 days. Creating a new link invalidates the previous one. Recalled results disappear automatically.</p>

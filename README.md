@@ -24,4 +24,10 @@ The student Skill Passport summarizes released results and topic performance, of
 
 The admin console includes reusable assessment templates, future question revision history, and accommodations configured before an attempt. Extra time and approved camera alternatives are enforced by the backend. Reading scale, contrast, and dialog keyboard controls are available throughout the frontend.
 
+Exam Results includes assessment analytics: distributions, topic performance, per-question presentation/answer/full-mark rates and protected CSV exports. Statistics use the paper each participant actually received and show sample-size warnings.
+
+Passing released results in the Skill Passport provide private certificate PDFs and optional 30-day verification links. Students can replace/revoke links; changed marks, recalled results and disabled accounts invalidate verification. The verifier checks the current Zyphor record and matching PDF identifier, without claiming independent accreditation.
+
+The Aa menu includes low-bandwidth mode. It reduces optional health checks from every 20 seconds to every minute and minimizes animation. Autosave, exam heartbeat, camera monitoring and manual rechecks continue normally.
+
 Deploy the matching backend before publishing these frontend features. A successful frontend build does not prove compiler execution, camera detection, Moodle integration, or 300-participant capacity. Those live checks are tracked in the laptop repository's `docs/feature-upgrade-status.md`.

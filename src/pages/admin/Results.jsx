@@ -6,6 +6,7 @@ import { Badge, Loading, Modal, useConfirm, useToast } from "../../components/ui
 import { Stat, useAdmin, windowBadgeProps } from "./context.jsx";
 import AttemptDetail, { reasonText } from "./AttemptDetail.jsx";
 import Challenges from "./Challenges.jsx";
+import AssessmentAnalytics from "./AssessmentAnalytics.jsx";
 
 export default function Results() {
   const { examId } = useParams();
@@ -89,6 +90,7 @@ export default function Results() {
   return (
     <>
       <Challenges examId={examId} onChanged={load} />
+      <AssessmentAnalytics examId={examId} />
       <div className="row between">
         <div>
           <Link to="/console/exams" className="small">← Exams</Link>

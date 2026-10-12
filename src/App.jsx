@@ -12,6 +12,7 @@ import StudentDashboard from "./pages/student/Dashboard.jsx";
 import CoordinatorDashboard from "./pages/coordinator/CoordinatorDashboard.jsx";
 import { PublicSkillPassport } from "./pages/student/SkillPassport.jsx";
 import AccessibilitySettings from "./components/AccessibilitySettings.jsx";
+import CertificateVerification from "./pages/student/CertificateVerification.jsx";
 
 // The code editor is most of the bundle, and only the exam page needs it.
 // A tab opened before a new deploy asks for a chunk that no longer exists; reload once to pick up
@@ -40,6 +41,7 @@ function PrivateApp() {
       <ConfirmHost>
           <Routes>
             <Route path="/passport/:token" element={<PublicSkillPassport />} />
+            <Route path="/certificates/:token" element={<CertificateVerification />} />
             <Route path="/" element={<Root />} />
             <Route path="/login" element={<Login />} />
             <Route

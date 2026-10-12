@@ -908,3 +908,7 @@ tbody tr:hover { background: var(--surface-2); }
 .high-contrast[data-theme="dark"] { --muted: #e2e8f0; --faint: #cbd5e1; --border: #94a3b8; }
 @media (prefers-color-scheme: dark) { :root.high-contrast:not([data-theme="light"]) { --muted: #e2e8f0; --faint: #cbd5e1; --border: #94a3b8; } }
 :focus-visible { outline: 3px solid var(--primary, #2563eb); outline-offset: 3px; }
+.analytics-distribution { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px 24px; }
+.analytics-bin { display: grid; grid-template-columns: 140px 1fr 24px; align-items: center; gap: 8px; }
+.analytics-bin meter { width: 100%; accent-color: #2563eb; }
+.low-bandwidth *, .low-bandwidth *::before, .low-bandwidth *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }

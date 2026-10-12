@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { store } from "../lib/api.js";
+import { setLowBandwidth, useLowBandwidth } from "../lib/networkPreferences.js";
 
 export default function AccessibilitySettings() {
+  const lowBandwidth = useLowBandwidth();
+  useEffect(() => { document.documentElement.classList.toggle("low-bandwidth", lowBandwidth); }, [lowBandwidth]);
   const [size, setSize] = useState(() => Number(store.get("zyphor_text_size")) || 100);
   const [contrast, setContrast] = useState(() => store.get("zyphor_high_contrast") === "true");
   useEffect(() => {
@@ -21,6 +24,8 @@ export default function AccessibilitySettings() {
         {[100, 115, 130, 150].map(s => <option key={s} value={s}>{s}%</option>)}
       </select>
       <label><input type="checkbox" checked={contrast} onChange={e => setContrast(e.target.checked)} /> High contrast</label>
+      <label><input type="checkbox" checked={lowBandwidth} onChange={e => setLowBandwidth(e.target.checked)} /> Low bandwidth</label>
+      <p className="small muted">Reduces optional connection checks and animations. Exam saves, heartbeat and camera monitoring stay active.</p>
     </div>
   </details>;
 }

@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { apiUrl } from "../lib/api.js";
+import { useLowBandwidth } from "../lib/networkPreferences.js";
 
 // A browser's online flag only describes its network adapter. A bounded request
 // to our own API verifies the connection that actually matters for this exam.
 export default function ExamConnectionStatus({ heartbeatAt, heartbeatError }) {
+  const lowBandwidth = useLowBandwidth();
   const [state, setState] = useState({ status: "checking", latency: null, checkedAt: null });
   const [checking, setChecking] = useState(false);
   const [retry, setRetry] = useState(0);
@@ -43,7 +45,7 @@ export default function ExamConnectionStatus({ heartbeatAt, heartbeatError }) {
       setState({ status: "offline", latency: null, checkedAt: new Date() });
     };
     check();
-    const interval = setInterval(check, 20000);
+    const interval = setInterval(check, lowBandwidth ? 60000 : 20000);
     window.addEventListener("online", check);
     window.addEventListener("offline", offline);
     document.addEventListener("visibilitychange", check);
@@ -56,13 +58,14 @@ export default function ExamConnectionStatus({ heartbeatAt, heartbeatError }) {
       window.removeEventListener("offline", offline);
       document.removeEventListener("visibilitychange", check);
     };
-  }, [retry]);
+  }, [retry, lowBandwidth]);
   const labels = { checking: "Checking connection", connected: "Server connected", slow: "Slow server connection", unreachable: "Server unreachable", offline: "Offline" };
   const issue = heartbeatError || ["offline", "unreachable"].includes(state.status);
   return <details className={"exam-connection " + (issue ? "connection-warning" : state.status)}>
     <summary><span className="connection-dot" aria-hidden="true" /><span role="status">{heartbeatError ? "Exam sync interrupted" : labels[state.status]}</span></summary>
     <div className="connection-details">
       <strong>Exam connection</strong>
+      {lowBandwidth && <p className="small muted">Low bandwidth: optional health checks run every minute. Exam heartbeat and saves continue normally.</p>}
       <dl><dt>Browser network</dt><dd>{navigator.onLine ? "Available" : "Offline"}</dd>
         <dt>API and database</dt><dd>{labels[state.status]}</dd>
         <dt>Response time</dt><dd>{state.latency === null ? "—" : `${state.latency} ms`}</dd>
