@@ -1,3 +1,4 @@
+import ExamConnectionStatus from "../../components/ExamConnectionStatus.jsx";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../../lib/api.js";
@@ -42,6 +43,8 @@ export default function Exam() {
   const [submitting, setSubmitting] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [saveLabel, setSaveLabel] = useState("");
+  const [heartbeatAt, setHeartbeatAt] = useState(null);
+  const [heartbeatError, setHeartbeatError] = useState("");
   const [judgeLanguages, setJudgeLanguages] = useState([]);
 
   // Refs mirror state for use inside long-lived event listeners.
@@ -270,7 +273,9 @@ export default function Exam() {
     if (finishedRef.current) return;
     try {
       const r = await api("POST", `/api/zyphor/student/attempts/${attemptRef.current}/heartbeat`,
-                          null, hdr());
+                          null, { ...hdr(), timeoutMs: 8000 });
+      setHeartbeatAt(new Date());
+      setHeartbeatError("");
       if (r.status !== "in_progress") {
         finish(r.status === "auto_submitted" ? "Your exam was submitted." : "Exam submitted.");
         return;
@@ -279,8 +284,8 @@ export default function Exam() {
       deadlineRef.current = Date.now() + r.seconds_left * 1000;
       setViolations((v) => (r.violations !== v ? r.violations : v));
       setExamPaused(false);
-    } catch {
-      /* offline — the next heartbeat will resync */
+    } catch (err) {
+      setHeartbeatError(err.message || "Could not synchronize this exam with the server.");
     }
   }, [hdr, finish, handleConflict]);
 
@@ -303,7 +308,8 @@ export default function Exam() {
     }, 500);
     // Every open exam checks in once a minute: enough to resync the timer and show who's online,
     // while keeping a full hall from loading the server with background traffic
-    const hb = setInterval(heartbeat, 60000);
+    heartbeat();
+    const hb = setInterval(heartbeat, 20000);
     const autosave = setInterval(() => saveCode(false), 15000);
     return () => { clearInterval(tick); clearInterval(hb); clearInterval(autosave); };
   }, [phase, saveCode, examApi, finish, heartbeat, flushSaves]);
@@ -380,10 +386,10 @@ export default function Exam() {
     });
     on(window, "offline", () =>
       toast("You're offline. Keep working; answers will sync when you reconnect.", "error", 6000));
-    on(window, "online", () => { violation("network_online"); heartbeat(); toast("Back online", "success"); });
+    on(window, "online", () => { violation("network_online"); heartbeat(); flushSaves(); toast("Network available. Checking exam sync…", "info"); });
 
     return () => off.forEach((fn) => fn());
-  }, [phase, paper, violation, saveCode, heartbeat, toast]);
+  }, [phase, paper, violation, saveCode, heartbeat, flushSaves, toast]);
 
   useEffect(() => () => { document.body.classList.remove("exam-mode", "no-select"); }, []);
 
@@ -557,6 +563,7 @@ export default function Exam() {
           <button className="btn sm menu-toggle" onClick={() => setPaletteOpen((o) => !o)}
                   aria-label="Questions">☰</button>
           <div className="title"><span className="workspace-eyebrow">ASSESSMENT WORKSPACE</span>{paper.exam.title}</div>
+          <ExamConnectionStatus heartbeatAt={heartbeatAt} heartbeatError={heartbeatError} />
           <span className="save-status" role="status">{saveLabel || "Answers save automatically"}</span>
           <span className="small muted">{user.name} · {user.roll_no}</span>
           {violations

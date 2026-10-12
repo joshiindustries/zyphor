@@ -66,24 +66,19 @@ export default function Colleges() {
                     <strong>{c.name}</strong>{" "}
                     {c.org_type === "event" && <Badge color="violet">Event</Badge>}
                     {c.features?.length > 0 && (
-                      <div className="muted small">Add-ons: {c.features.map((k) => k.replace("_", " ")).join(", ")}</div>
+                      <div className="muted small">Settings: {c.features.map((k) => k.replace("_", " ")).join(", ")}</div>
                     )}
                     {c.organizer && <div className="muted small">By {c.organizer}</div>}
                     {c.city && <div className="muted small">{c.city}</div>}
                   </td>
                   <td><code>{c.code}</code></td>
-                  <td className="num">{c.student_count}{c.max_students ? ` / ${c.max_students}` : ""}</td>
+                  <td className="num">{c.student_count}</td>
                   <td className="num">{c.admin_count}</td>
-                  <td className="num">{c.exam_count}{c.max_exams ? ` / ${c.max_exams}` : ""}</td>
+                  <td className="num">{c.exam_count}</td>
                   <td>
                     {!c.is_active ? <Badge color="red">Disabled</Badge>
-                      : c.expired ? <Badge color="red">Expired</Badge>
                       : <Badge color="green">Active</Badge>}
-                    {c.access_until && (
-                      <div className="muted small">
-                        {c.expired ? "ended" : "until"} {new Date(c.access_until).toLocaleDateString()}
-                      </div>
-                    )}
+
                   </td>
                   <td>
                     <div className="row tight">
@@ -188,8 +183,6 @@ function CollegeForm({ college, initialType, onClose, onSaved }) {
     name: college?.name || "",
     code: college?.code || "",
     city: college?.city || "",
-    max_students: college?.max_students || "",
-    max_exams: college?.max_exams || "",
     org_type: college?.org_type || initialType || "college",
     organizer: college?.organizer || "",
     event_starts_at: college?.event_starts_at ? toDateInput(college.event_starts_at) : "",
@@ -197,7 +190,6 @@ function CollegeForm({ college, initialType, onClose, onSaved }) {
     logo: college?.logo || "",
     brand_color: college?.brand_color || "#e12616",
     // stored as end of that day, local time
-    access_until: college?.access_until ? toDateInput(college.access_until) : "",
     contact_email: college?.contact_email || "",
     contact_phone: college?.contact_phone || "",
     single_login: college?.single_login || false,
@@ -212,16 +204,12 @@ function CollegeForm({ college, initialType, onClose, onSaved }) {
     if (!college && !f.code.trim()) return toast(`Enter a ${noun} code`, "error");
     if (f.org_type === "event") {
       if (!f.organizer.trim()) return toast("Enter the client / organizer running this event", "error");
-      if (f.event_starts_at && f.access_until && f.access_until < f.event_starts_at)
-        return toast("The event can't end before it starts", "error");
     }
     const body = {
       name: f.name,
       city: nullIfBlank(f.city),
       contact_email: nullIfBlank(f.contact_email),
       contact_phone: nullIfBlank(f.contact_phone),
-      max_students: f.max_students ? Number(f.max_students) : null,
-      max_exams: f.max_exams ? Number(f.max_exams) : null,
       org_type: f.org_type,
       organizer: f.org_type === "event" ? f.organizer.trim() : null,
       event_starts_at: f.org_type === "event" && f.event_starts_at
@@ -229,7 +217,6 @@ function CollegeForm({ college, initialType, onClose, onSaved }) {
       features: f.org_type === "event" ? f.features : [],
       logo: f.org_type === "event" && f.features.includes("branding") ? f.logo || null : null,
       brand_color: f.brand_color || null,
-      access_until: f.access_until ? new Date(`${f.access_until}T23:59:59`).toISOString() : null,
       single_login: f.single_login,
     };
     try {
@@ -286,15 +273,6 @@ function CollegeForm({ college, initialType, onClose, onSaved }) {
             <input type="date" value={f.event_starts_at} onChange={set("event_starts_at")} />
           </Field>
         )}
-        <Field label={f.org_type === "event" ? "Event ends (access stops after this day)" : "Access until (blank = no end date)"}>
-          <input type="date" value={f.access_until} onChange={set("access_until")} />
-        </Field>
-        <Field label={f.org_type === "event" ? "Participants allowed (blank = unlimited)" : "Student limit (blank = unlimited)"}>
-          <input type="number" min="1" value={f.max_students} onChange={set("max_students")} />
-        </Field>
-        <Field label={f.org_type === "event" ? "Exams / rounds included (blank = unlimited)" : "Exam limit (blank = unlimited)"}>
-          <input type="number" min="1" value={f.max_exams} onChange={set("max_exams")} />
-        </Field>
         <Field label={f.org_type === "event" ? "Client contact email" : "Contact email"}>
           <input type="email" value={f.contact_email} onChange={set("contact_email")} />
         </Field>
@@ -303,7 +281,7 @@ function CollegeForm({ college, initialType, onClose, onSaved }) {
         </Field>
       </div>
       {f.org_type === "event" && (
-        <EventAddOns f={f} setF={setF} />
+        <EventSettings f={f} setF={setF} />
       )}
       <label className="check">
         <input type="checkbox" checked={f.single_login} onChange={set("single_login")} />
@@ -429,12 +407,12 @@ function toDateInput(iso) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-const ADD_ONS = [
+const EVENT_SETTINGS = [
   ["branding", "Branding", "Their logo and colour on their students' sign-in, dashboard and exam screens"],
   ["email_results", "Email results", "Admin can email every student their score and rank"],
 ];
 
-function EventAddOns({ f, setF }) {
+function EventSettings({ f, setF }) {
   const toast = useToast();
   const toggle = (key) => setF((v) => ({
     ...v, features: v.features.includes(key) ? v.features.filter((k) => k !== key) : [...v.features, key],
@@ -452,9 +430,9 @@ function EventAddOns({ f, setF }) {
 
   return (
     <div className="card pad-sm" style={{ margin: "4px 0 14px" }}>
-      <strong className="small">Paid add-ons for this event</strong>
-      <p className="muted small" style={{ margin: "2px 0 8px" }}>Only what you tick is available to this event.</p>
-      {ADD_ONS.map(([key, label, hint]) => (
+      <strong className="small">Event settings</strong>
+      <p className="muted small" style={{ margin: "2px 0 8px" }}>Choose the features to enable for this event. All are included.</p>
+      {EVENT_SETTINGS.map(([key, label, hint]) => (
         <label key={key} className="check" style={{ alignItems: "flex-start" }}>
           <input type="checkbox" checked={f.features.includes(key)} onChange={() => toggle(key)} />
           <span><strong>{label}</strong> <span className="muted small">— {hint}</span></span>

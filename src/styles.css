@@ -887,3 +887,16 @@ tbody tr:hover { background: var(--surface-2); }
 
 .nav-backdrop { display: none; }
 @media (max-width: 880px) { .nav-backdrop { display: block; position: fixed; inset: 0; z-index: 59; border: 0; background: #0b122099; } }
+
+.exam-connection { position: relative; font-size: 11px; }
+.exam-connection summary { display: flex; align-items: center; gap: 7px; cursor: pointer; border: 1px solid var(--border); padding: 6px 10px; border-radius: 999px; list-style: none; }
+.exam-connection summary::-webkit-details-marker { display: none; }
+.connection-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+.exam-connection.connected .connection-dot { background: var(--success); }
+.exam-connection.slow .connection-dot, .connection-warning .connection-dot { background: var(--warning); }
+.connection-warning summary { background: var(--warning-soft); color: var(--warning); }
+.connection-details { position: absolute; top: calc(100% + 10px); left: 0; z-index: 80; width: min(320px, 80vw); border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 12px; padding: 18px; box-shadow: var(--sh-md); }
+.connection-details dl { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.connection-details dt { color: var(--muted); }
+.connection-details dd { margin: 0; }
+.connection-details p { color: var(--warning); }

@@ -74,23 +74,19 @@ export default function Overview() {
           <p className="muted small" style={{ marginTop: -6 }}>
             {college.college.organizer && <>By <strong>{college.college.organizer}</strong> · </>}
             {college.college.event_starts_at && <>
-              {new Date(college.college.event_starts_at).toLocaleDateString()} to{" "}
+              {new Date(college.college.event_starts_at).toLocaleDateString()}
             </>}
-            {college.college.access_until
-              ? <>{college.college.event_starts_at ? "" : "Access until "}<strong>{new Date(college.college.access_until).toLocaleDateString()}</strong></>
-              : "No end date"}
+
           </p>
           <SignInLink org={college.college} />
           <div className="grid cols-4">
             <Stat
               label="Students"
-              value={college.college.max_students
-                ? `${college.students} / ${college.college.max_students}`
-                : college.students}
+              value={college.students}
               sub={`${college.active_students} active`}
             />
             <Stat label="Exams"
-                  value={college.college.max_exams ? `${college.exams} / ${college.college.max_exams}` : college.exams}
+                  value={college.exams}
                   sub={`${college.live_exams} live · ${college.upcoming_exams} scheduled`} />
             <Stat label="Writing now" value={college.live_attempts}
                   tone={college.live_attempts ? "green" : "plain"} />

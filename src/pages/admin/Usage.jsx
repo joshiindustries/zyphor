@@ -5,7 +5,7 @@ import { Stat } from "./context.jsx";
 
 const thisMonth = () => new Date().toISOString().slice(0, 7);
 
-/** Super admin: what each organization used in a month, for billing. */
+/** Super admin: what each organization used in a month, for operational reporting. */
 export default function Usage() {
   const toast = useToast();
   const [month, setMonth] = useState(thisMonth());
@@ -18,9 +18,9 @@ export default function Usage() {
 
   function exportCsv() {
     downloadCSV(`zyphor_usage_${data.month}.csv`,
-      ["Name", "Code", "Type", "Add-ons", "Students", "Exams created this month", "Exams total", "Exam limit", "Attempts this month", "Status"],
+      ["Name", "Code", "Type", "Settings", "Students", "Exams created this month", "Exams total", "Attempts this month", "Status"],
       data.organizations.map((o) => [o.name, o.code, o.org_type, o.features.join(" "), o.students, o.exams_created,
-        o.exams_total, o.max_exams ?? "", o.attempts, !o.is_active ? "disabled" : o.expired ? "expired" : "active"]));
+        o.exams_total, o.attempts, !o.is_active ? "disabled" : "active"]));
   }
 
   return (
@@ -28,7 +28,7 @@ export default function Usage() {
       <div className="row between" style={{ marginBottom: 6 }}>
         <div className="page-head" style={{ margin: 0 }}>
           <h1>Usage</h1>
-          <p className="lede">What each college and event used in a month. Use it for invoices and renewals.</p>
+          <p className="lede">What each college and event used in a month. Track participation and assessment activity.</p>
         </div>
         <div className="row tight">
           <input type="month" value={month} max={thisMonth()} onChange={(e) => e.target.value && setMonth(e.target.value)} />
@@ -47,8 +47,8 @@ export default function Usage() {
             <table>
               <thead>
                 <tr>
-                  <th>Name</th><th>Add-ons</th><th className="num">Students</th>
-                  <th className="num">Exams this month</th><th className="num">Exams used</th>
+                  <th>Name</th><th>Settings</th><th className="num">Students</th>
+                  <th className="num">Exams this month</th><th className="num">Total exams</th>
                   <th className="num">Attempts this month</th><th>Status</th>
                 </tr>
               </thead>
@@ -62,10 +62,10 @@ export default function Usage() {
                     <td className="small">{o.features.map((k) => k.replace("_", " ")).join(", ") || "—"}</td>
                     <td className="num">{o.students}</td>
                     <td className="num">{o.exams_created}</td>
-                    <td className="num">{o.exams_total}{o.max_exams ? ` / ${o.max_exams}` : ""}</td>
+                    <td className="num">{o.exams_total}</td>
                     <td className="num"><strong>{o.attempts}</strong></td>
                     <td>{!o.is_active ? <Badge color="red">Disabled</Badge>
-                      : o.expired ? <Badge color="red">Expired</Badge> : <Badge color="green">Active</Badge>}</td>
+                      : <Badge color="green">Active</Badge>}</td>
                   </tr>
                 ))}
               </tbody>
