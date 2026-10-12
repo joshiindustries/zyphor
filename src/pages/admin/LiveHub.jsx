@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { api } from "../../lib/api.js";
 import { Badge, Empty, Loading, useToast } from "../../components/ui.jsx";
+import { ErrorState } from "../../components/Recovery.jsx";
 import { useAdmin, windowBadgeProps } from "./context.jsx";
 
 /** Sidebar shortcut: jump straight into Live Monitor without hunting through the Exams list. */
@@ -9,15 +10,19 @@ export default function LiveHub() {
   const { collegeId, cq } = useAdmin();
   const toast = useToast();
   const [exams, setExams] = useState(null);
+  const [error, setError] = useState("");
+  const [reload, setReload] = useState(0);
 
   useEffect(() => {
     setExams(null);
+    setError("");
     api("GET", "/api/zyphor/admin/exams" + cq())
       .then(setExams)
-      .catch((err) => { toast(err.message, "error", 6000); setExams([]); });
+      .catch((err) => { setError(err.message); setExams([]); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [collegeId]);
+  }, [collegeId, reload]);
 
+  if (error) return <ErrorState message={error} onRetry={() => setReload((n) => n + 1)} />;
   if (!exams) return <Loading />;
 
   const running = exams.filter((e) => e.is_published && (e.window === "live" || e.window === "paused"));

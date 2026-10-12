@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { api } from "../../lib/api.js";
 import { Badge, Empty, Loading, useToast } from "../../components/ui.jsx";
+import { ErrorState } from "../../components/Recovery.jsx";
 import { Stat, cap, orgNoun, useAdmin } from "./context.jsx";
 
 export default function Overview() {
@@ -10,10 +11,13 @@ export default function Overview() {
   const [platform, setPlatform] = useState(null);
   const [college, setCollege] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [reload, setReload] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setError("");
     (async () => {
       try {
         if (isSuper) {
@@ -27,22 +31,24 @@ export default function Overview() {
           setCollege(null);
         }
       } catch (err) {
-        if (!cancelled) toast(err.message, "error", 6000);
+        if (!cancelled) setError(err.message);
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSuper, collegeId]);
+  }, [isSuper, collegeId, reload]);
 
   if (loading) return <Loading />;
+  if (error) return <ErrorState message={error} onRetry={() => setReload((n) => n + 1)} />;
   if (!platform && !college) {
     return <Empty title="Nothing here yet" hint="Create your first college or event under Colleges & Events." />;
   }
 
   return (
     <>
+      <section className="workspace-welcome"><div><span className="workspace-eyebrow">ZYPHOR / CONTROL CENTER</span><h1>{isSuper ? "Your assessment operations, at a glance." : "Ready for your next assessment."}</h1><p>Manage participants, follow live sessions, and review results from one workspace.</p></div><div className="row"><NavLink className="btn primary" to="/console/exams">Manage exams ↗</NavLink><NavLink className="btn" to="/console/live">Live monitor</NavLink></div></section>
       {platform && (
         <>
           <div className="page-head"><h1>Platform overview</h1></div>

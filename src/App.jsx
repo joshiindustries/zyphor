@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, RequireRole, useAuth } from "./lib/auth.jsx";
 import { ConfirmHost, Loading, ToastHost } from "./components/ui.jsx";
 import { homeFor, loadBackendConfig } from "./lib/api.js";
+import { ErrorBoundary, ConnectionNotice } from "./components/Recovery.jsx";
 import Home from "./pages/Home.jsx";
 
 import Login from "./pages/Login.jsx";
@@ -73,8 +74,8 @@ function PrivateApp() {
 }
 
 export default function App() {
-  return <ToastHost><Routes>
+  return <ErrorBoundary><ToastHost><ConnectionNotice /><Routes>
     <Route path="/" element={<Home />} />
     <Route path="/*" element={<PrivateApp />} />
-  </Routes></ToastHost>;
+  </Routes></ToastHost></ErrorBoundary>;
 }

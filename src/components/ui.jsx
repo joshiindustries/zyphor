@@ -89,7 +89,7 @@ export function ToastHost({ children }) {
     <ToastCtx.Provider value={push}>
       {children}
       {createPortal(
-        <div id="toasts">
+        <div id="toasts" aria-live="polite" aria-atomic="false">
           {items.map((t) => <div key={t.id} className={"toast " + t.type}>{t.message}</div>)}
         </div>,
         document.body

@@ -4,6 +4,7 @@ import { api } from "../../lib/api.js";
 import { useAuth } from "../../lib/auth.jsx";
 import { fmtDate } from "../../lib/format.js";
 import { Badge, Credit, Empty, Loading, OrgBrand, ThemeToggle, useToast } from "../../components/ui.jsx";
+import { ErrorState } from "../../components/Recovery.jsx";
 import ChangePassword from "./ChangePassword.jsx";
 import ResultModal from "./ResultModal.jsx";
 import LeaderboardModal from "./LeaderboardModal.jsx";
@@ -99,6 +100,7 @@ export default function Dashboard() {
   const load = useCallback(async () => {
     try {
       setData(await api("GET", "/api/zyphor/student/dashboard"));
+      setError("");
     } catch (err) {
       setError(err.message);
     }
@@ -161,7 +163,7 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {error && <Empty title={error} />}
+      {error && <ErrorState message={error} onRetry={load} />}
       {!data && !error && <Loading />}
 
       {data && (

@@ -37,6 +37,7 @@ export default function Console() {
   );
   const [ready, setReady] = useState(!isSuper);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => store.get("zyphor_nav_collapsed") === "true");
   const mustChange = !!user.must_change_password; // kept fresh by AuthProvider
 
   // Super admins pick which college they are acting inside.
@@ -119,17 +120,19 @@ export default function Console() {
 
   return (
     <AdminCtx.Provider value={ctx}>
-      <div className="shell">
+      <div className={"shell" + (collapsed ? " nav-collapsed" : "")}>
+        {sidebarOpen && <button className="nav-backdrop" aria-label="Close navigation" onClick={() => setSidebarOpen(false)} />}
         <aside className={"sidebar" + (sidebarOpen ? " open" : "")}>
           <Brand sub={isSuper ? "Super Admin" : user.role === "coordinator" ? "Event Coordinator" : org?.org_type === "event" ? "Event Admin" : "College Admin"} />
-          <nav className="nav">
+          <button className="btn sm collapse-nav" aria-label={collapsed ? "Expand navigation" : "Collapse navigation"} aria-expanded={!collapsed} onClick={() => { setCollapsed(!collapsed); store.set("zyphor_nav_collapsed", String(!collapsed)); }}>{collapsed ? "→" : "← Collapse navigation"}</button>
+          <nav className="nav" aria-label="Workspace">
             {NAV.map((n, i) =>
               n.group ? (
                 <div className="group" key={"g" + i}>{n.group}</div>
               ) : (
                 <NavLink key={n.id} to={n.to} end={n.end}
-                         className={({ isActive }) => (isActive ? "active" : "")}>
-                  <NavIcon id={n.id} /> {n.label}
+                         title={n.label} aria-label={n.label} className={({ isActive }) => (isActive ? "active" : "")}>
+                  <NavIcon id={n.id} /> <span className="nav-label">{n.label}</span>
                 </NavLink>
               )
             )}
@@ -145,10 +148,11 @@ export default function Console() {
           </div>
         </aside>
 
-        <main className="main">
+        <main className="main" id="main-content">
+          <a className="skip-link" href="#main-content">Skip to content</a>
           <div className="topbar">
             <div className="row">
-              <button className="btn sm menu-toggle" aria-label="Menu"
+              <button className="btn sm menu-toggle" aria-label="Open navigation" aria-expanded={sidebarOpen}
                       onClick={() => setSidebarOpen((o) => !o)}>☰</button>
               {(isSuper || colleges.length > 1) && (
                 <div className="row tight">

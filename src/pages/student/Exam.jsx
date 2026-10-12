@@ -232,10 +232,12 @@ export default function Exam() {
   const saveMcq = useCallback((itemId, next) => {
     cancelRetry(`mcq:${itemId}`);  // this newer answer replaces any older one still waiting to retry
     savingRef.current = savingRef.current
-      .then(() => examApi("PUT", `/mcq/${itemId}`,
-        { selected: next.selected, marked_for_review: next.review }))
+      .then(() => { setSaveLabel("Saving…"); return examApi("PUT", `/mcq/${itemId}`,
+        { selected: next.selected, marked_for_review: next.review }); })
+      .then(() => setSaveLabel("Saved " + new Date().toLocaleTimeString()))
       .catch((err) => {
         if (err.status !== 409) {
+          setSaveLabel("Not saved · reconnect to retry");
           toast("Couldn't save your answer: " + err.message + ". It will retry.", "error");
           retryLater(`mcq:${itemId}`, () => saveMcq(itemId, next));
         }
@@ -550,11 +552,12 @@ export default function Exam() {
 
   return (
     <>
-      <div className="exam-shell">
+      <div className="exam-shell" style={{ gridTemplateRows: "auto " + (examPaused ? "auto " : "") + (paper.exam.mediapipe_enabled ? "auto " : "") + "minmax(0, 1fr)" }}>
         <div className="exam-head">
           <button className="btn sm menu-toggle" onClick={() => setPaletteOpen((o) => !o)}
                   aria-label="Questions">☰</button>
-          <div className="title">{paper.exam.title}</div>
+          <div className="title"><span className="workspace-eyebrow">ASSESSMENT WORKSPACE</span>{paper.exam.title}</div>
+          <span className="save-status" role="status">{saveLabel || "Answers save automatically"}</span>
           <span className="small muted">{user.name} · {user.roll_no}</span>
           {violations
             ? <Badge color={violations >= maxViol - 1 ? "red" : "amber"}>⚠ {violations}/{maxViol} violations</Badge>
@@ -584,7 +587,8 @@ export default function Exam() {
         {paper.exam.mediapipe_enabled && <MediaPipeMonitor attemptId={paper.attempt_id} session={sessionRef.current} policy={info?.mediapipe_policy || {}} onMultipleFaces={(count) => violation("multiple_faces", `More than one face detected (${count})`)} onBlocked={(type) => finish(type === "multiple_faces" ? "More than one face detected. Your exam was submitted." : type === "no_face" ? "No face could be verified. Your exam was submitted." : "Camera monitoring could not be verified. Your exam was submitted.")} />}
 
         <div className="exam-body">
-          <aside className={"palette" + (paletteOpen ? " open" : "")}>
+          <aside className={"palette" + (paletteOpen ? " open" : "")} aria-label="Question navigation">
+            <div className="palette-summary"><span className="workspace-eyebrow">YOUR PROGRESS</span><strong>{answeredCount}<small> / {paper.items.length} answered</small></strong><progress value={answeredCount} max={paper.items.length} aria-label="Questions answered" /></div>
             {sections.map((sec) => (
               <div key={sec}>
                 <h4>{sec}</h4>
@@ -592,6 +596,8 @@ export default function Exam() {
                   {paper.items.map((it, i) => it.section !== sec ? null : (
                     <button
                       key={it.item_id}
+                      aria-label={`Question ${it.number}, ${isAnswered(it, mcq, code) ? "answered" : "unanswered"}${it.type === "mcq" && mcq[it.item_id]?.review ? ", marked for review" : ""}`}
+                      aria-current={i === index ? "step" : undefined}
                       className={[
                         "pal-btn",
                         isAnswered(it, mcq, code) ? "answered" : visited.has(it.item_id) ? "visited" : "",
@@ -770,7 +776,7 @@ export default function Exam() {
           <button className="btn primary" onClick={() => {
             saveCode(false);
             if (index < paper.items.length - 1) go(index + 1);
-            else toast("Saved", "success", 1500);
+            else toast("Save requested. Check the save status above.", "info", 2500);
           }}>
             {index === paper.items.length - 1 ? "Save" : "Save & next ›"}
           </button>

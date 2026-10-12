@@ -59,8 +59,11 @@ function apiBase() {
 }
 
 function errorMessage(data, status) {
+  if ([502, 503, 504, 530].includes(status)) return "The server is temporarily unavailable. Please retry in a moment.";
+  if (status === 413) return "This file is too large. Please upload a smaller file.";
+  if (status === 429) return "Too many requests. Please wait a moment and try again.";
   if (!data) return `Request failed (${status})`;
-  if (typeof data.detail === "string") return data.detail;
+  if (typeof data.detail === "string") return /<(!doctype|html|body)/i.test(data.detail) ? `The server returned an unexpected response (${status}). Please try again.` : data.detail;
   if (Array.isArray(data.detail)) {
     return data.detail
       .map((d) => `${(d.loc || []).filter((x) => x !== "body").join(".")}: ${d.msg}`)
@@ -90,16 +93,20 @@ export async function api(method, path, body, opts = {}) {
   let res;
   let followed = false;  // re-read backend.json at most once per call
   for (let attempt = 1; ; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), opts.timeoutMs || 45000);
     try {
-      res = await fetch(apiBase() + path, { method, headers, body: payload, keepalive: !!opts.keepalive });
+      res = await fetch(apiBase() + path, { method, headers, body: payload, keepalive: !!opts.keepalive, signal: controller.signal });
       // 530: Cloudflare can't reach the tunnel - the server restarted under a new address
       if (res.status === 530 && !followed && await backendMoved()) { followed = true; attempt = 0; continue; }
       if (![502, 503, 504].includes(res.status) || attempt >= attempts) break;
-    } catch {
+    } catch (error) {
+      if (error.name === "AbortError") throw new ApiError(0, "The request timed out. Please check the status before trying again.");
       // The old address is gone: if the server has moved, the request never reached it, so it's safe to resend
       if (!followed && await backendMoved()) { followed = true; attempt = 0; continue; }
       if (attempt >= attempts) throw new ApiError(0, "Cannot reach the server. Check your connection.");
     }
+    finally { clearTimeout(timeout); }
     await new Promise((r) => setTimeout(r, 400 * 2 ** (attempt - 1) + Math.random() * 300));
   }
 
