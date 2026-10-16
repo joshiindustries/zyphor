@@ -14,6 +14,17 @@ export default function Results() {
   const toast = useToast();
   const confirmBox = useConfirm();
   const [orgFeatures, setOrgFeatures] = useState([]);
+  const [emailDeliveries, setEmailDeliveries] = useState([]);
+
+  const loadEmailDeliveries = useCallback(async () => {
+    try {
+      const result = await api("GET", `/api/zyphor/admin/exams/${examId}/email-results` + cq());
+      setEmailDeliveries(result.deliveries || []);
+    } catch (err) { toast(err.message, "error", 6000); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [examId, collegeId]);
+
+  useEffect(() => { loadEmailDeliveries(); }, [loadEmailDeliveries]);
 
   useEffect(() => {
     api("GET", "/api/zyphor/admin/stats" + cq()).then((s) => setOrgFeatures(s.college.features || [])).catch(() => {});
@@ -26,9 +37,29 @@ export default function Results() {
       "Send emails"))) return;
     try {
       const r = await api("POST", `/api/zyphor/admin/exams/${examId}/email-results` + cq());
-      toast(`Sent ${r.sent} emails` + (r.skipped ? `, ${r.skipped} students have no email` : "")
-            + (r.failed.length ? `, ${r.failed.length} failed` : ""), r.failed.length ? "error" : "success", 7000);
+      toast(`Queued ${r.queued} emails` + (r.existing ? `, ${r.existing} already queued or sent` : "")
+            + (r.skipped ? `, ${r.skipped} students have no email` : ""), "success", 7000);
+      await loadEmailDeliveries();
     } catch (err) { toast(err.message, "error", 7000); }
+  }
+
+  async function reviewDelivery(delivery, decision) {
+    const descriptions = {
+      mark_sent: "Confirm you have verified with the mail server or recipient that this message was delivered. It will not be sent again.",
+      retry: delivery.status === "delivery_unknown"
+        ? "The prior SMTP outcome is unknown. Retrying may send a duplicate email. Continue only after checking delivery with the recipient or mail provider."
+        : "Retry this failed email delivery?",
+      abandon: "Stop retrying this email. The delivery record will be retained for audit.",
+    };
+    const labels = { mark_sent: "Mark delivered", retry: "Retry email", abandon: "Abandon" };
+    if (!(await confirmBox("Review email delivery", descriptions[decision], labels[decision], decision === "abandon"))) return;
+    try {
+      await api("POST", `/api/zyphor/admin/email-deliveries/${delivery.id}/review` + cq(), {
+        decision, reason: `Administrator selected ${decision} after reviewing delivery status.`,
+      });
+      toast("Delivery review saved", "success");
+      await loadEmailDeliveries();
+    } catch (err) { toast(err.message, "error"); }
   }
   const confirm = useConfirm();
 
@@ -124,6 +155,33 @@ export default function Results() {
         <Stat label="Passed" value={s.pass_count} sub={`pass mark ${data.exam.pass_percentage}%`} tone="green" />
         <Stat label="Flagged" value={s.flagged} sub="had violations" tone={s.flagged ? "red" : "plain"} />
       </div>
+
+      {emailDeliveries.length > 0 && (
+        <section className="card" aria-label="Result email delivery status">
+          <h2>Email delivery status</h2>
+          <p className="muted small">Ambiguous SMTP outcomes are held for review and are never retried automatically.</p>
+          <div className="table-wrap compact">
+            <table>
+              <thead><tr><th>Recipient</th><th>Status</th><th>Attempts</th><th>Last issue</th><th>Review</th></tr></thead>
+              <tbody>{emailDeliveries.map((delivery) => (
+                <tr key={delivery.id}>
+                  <td>{delivery.recipient}</td>
+                  <td><Badge color={delivery.status === "sent" ? "green" : delivery.status === "delivery_unknown" || delivery.status === "failed" ? "amber" : "plain"}>{delivery.status.replaceAll("_", " ")}</Badge></td>
+                  <td>{delivery.attempt_count}</td>
+                  <td>{delivery.last_error || "—"}</td>
+                  <td>{["delivery_unknown", "failed"].includes(delivery.status) ? (
+                    <span className="row tight">
+                      {delivery.status === "delivery_unknown" && <button className="btn sm" onClick={() => reviewDelivery(delivery, "mark_sent")}>Mark delivered</button>}
+                      <button className="btn sm" onClick={() => reviewDelivery(delivery, "retry")}>Retry</button>
+                      <button className="btn sm danger" onClick={() => reviewDelivery(delivery, "abandon")}>Abandon</button>
+                    </span>
+                  ) : "—"}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       <div className="tabs">
         <button className={tab === "ranked" ? "active" : ""} onClick={() => setTab("ranked")}>Ranked list</button>
