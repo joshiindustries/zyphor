@@ -28,6 +28,7 @@ export default function Students() {
   const [creds, setCreds] = useState(null);
   const [report, setReport] = useState(null);
   const [attemptId, setAttemptId] = useState(null);
+  const [membershipRequests, setMembershipRequests] = useState([]);
 
   useEffect(() => {
     api("GET", "/api/zyphor/admin/stats" + cq())
@@ -35,6 +36,21 @@ export default function Students() {
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [collegeId]);
+
+  const loadMembershipRequests = useCallback(async () => {
+    if (isEvent) { setMembershipRequests([]); return; }
+    try { setMembershipRequests(await api("GET", "/api/zyphor/admin/membership-requests" + cq())); }
+    catch { setMembershipRequests([]); }
+  }, [collegeId, isEvent]);
+  useEffect(() => { loadMembershipRequests(); }, [loadMembershipRequests]);
+
+  async function decideMembership(studentId, decision) {
+    try {
+      await api("POST", `/api/zyphor/admin/membership-requests/${studentId}/${decision}` + cq());
+      toast(decision === "approve" ? "Student approved" : "Request rejected", "success");
+      await Promise.all([loadMembershipRequests(), load()]);
+    } catch (err) { toast(err.message, "error"); }
+  }
 
   const load = useCallback(async () => {
     setData(null);
@@ -166,6 +182,17 @@ export default function Students() {
           )}
         </div>
       </div>
+
+      {!isEvent && membershipRequests.length > 0 && <section className="card" aria-label="Membership requests">
+        <div className="row between"><h2>Membership requests</h2><span className="muted small">Approve verified emails only</span></div>
+        <div className="table-wrap"><table><thead><tr><th>Name</th><th>Email</th><th>Branch</th><th>Email status</th><th /></tr></thead>
+          <tbody>{membershipRequests.map((request) => <tr key={request.id}>
+            <td>{request.name}</td><td>{request.email}</td><td>{request.branch || "—"}</td>
+            <td>{request.email_verified ? <Badge color="green">Verified</Badge> : <Badge color="amber">Unverified</Badge>}</td>
+            <td className="row tight"><button className="btn sm primary" disabled={!request.email_verified} onClick={() => decideMembership(request.id, "approve")}>Approve</button>
+              <button className="btn sm danger" onClick={() => decideMembership(request.id, "reject")}>Reject</button></td>
+          </tr>)}</tbody></table></div>
+      </section>}
 
       {data && (
         <div className="grid cols-2" style={{ marginBottom: 14, maxWidth: 420 }}>

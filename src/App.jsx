@@ -7,6 +7,7 @@ import { ErrorBoundary, ConnectionNotice } from "./components/Recovery.jsx";
 import Home from "./pages/Home.jsx";
 
 import Login from "./pages/Login.jsx";
+import AccountAccess from "./pages/AccountAccess.jsx";
 import Console from "./pages/admin/Console.jsx";
 import StudentDashboard from "./pages/student/Dashboard.jsx";
 import CoordinatorDashboard from "./pages/coordinator/CoordinatorDashboard.jsx";
@@ -47,6 +48,10 @@ function PrivateApp() {
             <Route path="/moodle" element={<RequireRole roles={["super_admin", "college_admin", "coordinator", "student"]}><MoodlePortal /></RequireRole>} />
             <Route path="/" element={<Root />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<AccountAccess mode="signup" />} />
+            <Route path="/verify-email" element={<AccountAccess mode="verify" />} />
+            <Route path="/forgot-password" element={<AccountAccess mode="forgot" />} />
+            <Route path="/reset-password" element={<AccountAccess mode="reset" />} />
             <Route
               path="/console/*"
               element={

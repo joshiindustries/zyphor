@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useAuth } from "../lib/auth.jsx";
 import { api, auth as tokenStore, homeFor, store } from "../lib/api.js";
 import { firebaseConfigured, firebaseSignIn } from "../lib/firebase.js";
@@ -250,7 +251,8 @@ export default function Login() {
 
           <div className="row between" style={{ marginTop: 15 }}>
             <p className="muted small" style={{ margin: 0 }}>
-              Forgot your password? Ask your placement office.
+              <Link to="/forgot-password">Forgot your password?</Link>
+              {" · "}<Link to="/signup">Create a student account</Link>
             </p>
             <ThemeToggle />
           </div>
