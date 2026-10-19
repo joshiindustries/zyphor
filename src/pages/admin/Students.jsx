@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, downloadCSV } from "../../lib/api.js";
-import { fmtDate } from "../../lib/format.js";
+import { api } from "../../lib/api.js";
 import {
   Badge, Field, Loading, Modal, ModalButton, useConfirm, useToast,
 } from "../../components/ui.jsx";
-import { nullIfBlank, useAdmin } from "./context.jsx";
+import { useAdmin } from "./context.jsx";
 import { CredentialsModal, Pager } from "./shared.jsx";
 import AttemptDetail from "./AttemptDetail.jsx";
 

@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../lib/api.js";
-import { fmtDate } from "../../lib/format.js";
+import { toLocalInput } from "../../lib/format.js";
 import {
   Badge, Empty, Field, Loading, Modal, ModalButton, useConfirm, useToast,
 } from "../../components/ui.jsx";
-import { nullIfBlank, useAdmin, cap, orgNoun } from "./context.jsx";
+import { nullIfBlank, useAdmin, cap } from "./context.jsx";
 import { CredentialsModal } from "./shared.jsx";
 
 export default function Colleges() {
@@ -185,7 +185,7 @@ function CollegeForm({ college, initialType, onClose, onSaved }) {
     city: college?.city || "",
     org_type: college?.org_type || initialType || "college",
     organizer: college?.organizer || "",
-    event_starts_at: college?.event_starts_at ? toDateInput(college.event_starts_at) : "",
+    event_starts_at: college?.event_starts_at ? toLocalInput(college.event_starts_at) : "",
     features: college?.features || [],
     logo: college?.logo || "",
     brand_color: college?.brand_color || "#e12616",

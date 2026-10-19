@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../../lib/api.js";
 import { fmtDate } from "../../lib/format.js";
 import {
-  Badge, Field, Loading, Modal, ModalButton, useConfirm, useToast,
+  Badge, Loading, Modal, useConfirm, useToast,
 } from "../../components/ui.jsx";
 import { useAdmin, windowBadgeProps } from "./context.jsx";
 import ExamSettings, { EXAM_TYPES } from "./ExamSettings.jsx";

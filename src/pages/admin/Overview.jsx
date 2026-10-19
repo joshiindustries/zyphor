@@ -117,7 +117,7 @@ export default function Overview() {
 /** The code students type at sign-in, and a link that has it filled in already. */
 function SignInLink({ org }) {
   const toast = useToast();
-  const link = `${location.origin}${import.meta.env.BASE_URL}login?code=${encodeURIComponent(org.code)}`;
+  const link = `${window.location.origin}${import.meta.env.BASE_URL}login?code=${encodeURIComponent(org.code)}`;
   const noun = orgNoun(org);
   return (
     <div className="banner" style={{ margin: "0 0 16px", alignItems: "center", flexWrap: "wrap" }}>

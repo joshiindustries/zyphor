@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { api } from "../../lib/api.js";
-import { LANG_LABELS, fromLocalInput, toLocalInput } from "../../lib/format.js";
+import { fromLocalInput, toLocalInput } from "../../lib/format.js";
 import { Field, Modal, ModalButton, useToast } from "../../components/ui.jsx";
 import { nullIfBlank, useAdmin } from "./context.jsx";
 
