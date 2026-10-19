@@ -4,18 +4,22 @@ import { AuthProvider, RequireRole, useAuth } from "./lib/auth.jsx";
 import { ConfirmHost, Loading, ToastHost } from "./components/ui.jsx";
 import { homeFor, loadBackendConfig } from "./lib/api.js";
 import { ErrorBoundary, ConnectionNotice } from "./components/Recovery.jsx";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "./lib/queryClient.js";
 import Home from "./pages/Home.jsx";
 
 import Login from "./pages/Login.jsx";
 import AccountAccess from "./pages/AccountAccess.jsx";
-import Console from "./pages/admin/Console.jsx";
 import StudentDashboard from "./pages/student/Dashboard.jsx";
-import Teams from "./pages/student/Teams.jsx";
-import CoordinatorDashboard from "./pages/coordinator/CoordinatorDashboard.jsx";
 import { PublicSkillPassport } from "./pages/student/SkillPassport.jsx";
 import AccessibilitySettings from "./components/AccessibilitySettings.jsx";
 import CertificateVerification from "./pages/student/CertificateVerification.jsx";
-import MoodlePortal, { LtiLaunch } from "./pages/MoodlePortal.jsx";
+
+const Console = lazy(() => import("./pages/admin/Console.jsx"));
+const CoordinatorDashboard = lazy(() => import("./pages/coordinator/CoordinatorDashboard.jsx"));
+const Teams = lazy(() => import("./pages/student/Teams.jsx"));
+const MoodlePortal = lazy(() => import("./pages/MoodlePortal.jsx"));
+const LtiLaunch = lazy(() => import("./pages/MoodlePortal.jsx").then(m => ({ default: m.LtiLaunch })));
 
 // The code editor is most of the bundle, and only the exam page needs it.
 // A tab opened before a new deploy asks for a chunk that no longer exists; reload once to pick up
@@ -42,6 +46,7 @@ function PrivateApp() {
   return (
     <AuthProvider>
       <ConfirmHost>
+        <Suspense fallback={<div className="pre-start"><Loading label="Loading…" /></div>}>
           <Routes>
             <Route path="/passport/:token" element={<PublicSkillPassport />} />
             <Route path="/certificates/:token" element={<CertificateVerification />} />
@@ -75,22 +80,31 @@ function PrivateApp() {
               path="/exam/:examId"
               element={
                 <RequireRole roles={["student"]}>
-                  <Suspense fallback={<div className="pre-start"><Loading /></div>}>
-                    <Exam />
-                  </Suspense>
+                  <Exam />
                 </RequireRole>
               }
             />
             <Route path="*" element={<Root />} />
           </Routes>
+        </Suspense>
       </ConfirmHost>
     </AuthProvider>
   );
 }
 
 export default function App() {
-  return <ErrorBoundary><ToastHost><ConnectionNotice /><AccessibilitySettings /><Routes>
-    <Route path="/" element={<Home />} />
-    <Route path="/*" element={<PrivateApp />} />
-  </Routes></ToastHost></ErrorBoundary>;
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ErrorBoundary>
+        <ToastHost>
+          <ConnectionNotice />
+          <AccessibilitySettings />
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/*" element={<PrivateApp />} />
+          </Routes>
+        </ToastHost>
+      </ErrorBoundary>
+    </QueryClientProvider>
+  );
 }

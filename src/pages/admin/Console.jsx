@@ -1,33 +1,33 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { api, store } from "../../lib/api.js";
 import { useAuth } from "../../lib/auth.jsx";
 import { Brand, Empty, Loading, ThemeToggle, useToast, Credit } from "../../components/ui.jsx";
 import { AdminCtx, NavIcon, makeCq, useAdmin } from "./context.jsx";
 
-import Overview from "./Overview.jsx";
-import Colleges from "./Colleges.jsx";
-import Students from "./Students.jsx";
-import Mcqs from "./Mcqs.jsx";
-import Problems from "./Problems.jsx";
-import Exams from "./Exams.jsx";
-import ExamBuilder from "./ExamBuilder.jsx";
-import Results from "./Results.jsx";
-import Live from "./Live.jsx";
-import LiveHub from "./LiveHub.jsx";
-import Announcements from "./Announcements.jsx";
-import Account from "./Account.jsx";
-import Preview from "./Preview.jsx";
-import Leaderboard from "./Leaderboard.jsx";
-import Usage from "./Usage.jsx";
-import Integrations from "./Integrations.jsx";
-import CoordinatorPortal from "./CoordinatorPortal.jsx";
-import EvaluationSheetAdmin from "./EvaluationSheetAdmin.jsx";
-import CoordinatorManagement from "./CoordinatorManagement.jsx";
-import Templates from "./Templates.jsx";
-import TeamRegistrations from "./TeamRegistrations.jsx";
-import EmailDeliveries from "./EmailDeliveries.jsx";
-import { MoodleWorkspace } from "../MoodlePortal.jsx";
+const Overview = lazy(() => import("./Overview.jsx"));
+const Colleges = lazy(() => import("./Colleges.jsx"));
+const Students = lazy(() => import("./Students.jsx"));
+const Mcqs = lazy(() => import("./Mcqs.jsx"));
+const Problems = lazy(() => import("./Problems.jsx"));
+const Exams = lazy(() => import("./Exams.jsx"));
+const ExamBuilder = lazy(() => import("./ExamBuilder.jsx"));
+const Results = lazy(() => import("./Results.jsx"));
+const Live = lazy(() => import("./Live.jsx"));
+const LiveHub = lazy(() => import("./LiveHub.jsx"));
+const Announcements = lazy(() => import("./Announcements.jsx"));
+const Account = lazy(() => import("./Account.jsx"));
+const Preview = lazy(() => import("./Preview.jsx"));
+const Leaderboard = lazy(() => import("./Leaderboard.jsx"));
+const Usage = lazy(() => import("./Usage.jsx"));
+const Integrations = lazy(() => import("./Integrations.jsx"));
+const CoordinatorPortal = lazy(() => import("./CoordinatorPortal.jsx"));
+const EvaluationSheetAdmin = lazy(() => import("./EvaluationSheetAdmin.jsx"));
+const CoordinatorManagement = lazy(() => import("./CoordinatorManagement.jsx"));
+const Templates = lazy(() => import("./Templates.jsx"));
+const TeamRegistrations = lazy(() => import("./TeamRegistrations.jsx"));
+const EmailDeliveries = lazy(() => import("./EmailDeliveries.jsx"));
+const MoodleWorkspace = lazy(() => import("../MoodlePortal.jsx").then(m => ({ default: m.MoodleWorkspace })));
 
 export default function Console() {
   const { user, logout } = useAuth();
@@ -199,33 +199,35 @@ export default function Console() {
           )}
 
           {!ready ? <Loading /> : (
-            <Routes>
-              <Route index element={<Overview />} />
-              <Route path="colleges" element={isSuper ? <Colleges /> : <Navigate to="/console" replace />} />
-              <Route path="coordinators" element={isSuper ? <CoordinatorManagement /> : <Navigate to="/console" replace />} />
-              <Route path="students" element={<Scoped><Students /></Scoped>} />
-              <Route path="team-registrations" element={(isSuper || user.role === "college_admin")
-                ? <Scoped><TeamRegistrations /></Scoped> : <Navigate to="/console" replace />} />
-              <Route path="email-deliveries" element={<Scoped><EmailDeliveries /></Scoped>} />
-              <Route path="mcqs" element={<Mcqs />} />
-              <Route path="problems" element={<Problems />} />
-              <Route path="exams" element={<Scoped><Exams /></Scoped>} />
-              <Route path="templates" element={<Scoped><Templates /></Scoped>} />
-              <Route path="exams/:examId" element={<Scoped><ExamBuilder /></Scoped>} />
-              <Route path="exams/:examId/evaluation" element={<Scoped><EvaluationSheetAdmin /></Scoped>} />
-              <Route path="exams/:examId/results" element={<Scoped><Results /></Scoped>} />
-              <Route path="exams/:examId/live" element={<Scoped><Live /></Scoped>} />
-              <Route path="live" element={<Scoped><LiveHub /></Scoped>} />
-              <Route path="coordinator" element={<CoordinatorPortal />} />
-              <Route path="exams/:examId/preview" element={<Scoped><Preview /></Scoped>} />
-              <Route path="usage" element={isSuper ? <Usage /> : <Navigate to="/console" replace />} />
-              <Route path="integrations" element={<Integrations />} />
-              <Route path="moodle" element={<Scoped><MoodleWorkspace collegeId={collegeId} /></Scoped>} />
-              <Route path="leaderboard" element={<Scoped><Leaderboard /></Scoped>} />
-              <Route path="announcements" element={<Announcements />} />
-              <Route path="account" element={<Account />} />
-              <Route path="*" element={<Navigate to="/console" replace />} />
-            </Routes>
+            <Suspense fallback={<Loading label="Loading section…" />}>
+              <Routes>
+                <Route index element={<Overview />} />
+                <Route path="colleges" element={isSuper ? <Colleges /> : <Navigate to="/console" replace />} />
+                <Route path="coordinators" element={isSuper ? <CoordinatorManagement /> : <Navigate to="/console" replace />} />
+                <Route path="students" element={<Scoped><Students /></Scoped>} />
+                <Route path="team-registrations" element={(isSuper || user.role === "college_admin")
+                  ? <Scoped><TeamRegistrations /></Scoped> : <Navigate to="/console" replace />} />
+                <Route path="email-deliveries" element={<Scoped><EmailDeliveries /></Scoped>} />
+                <Route path="mcqs" element={<Mcqs />} />
+                <Route path="problems" element={<Problems />} />
+                <Route path="exams" element={<Scoped><Exams /></Scoped>} />
+                <Route path="templates" element={<Scoped><Templates /></Scoped>} />
+                <Route path="exams/:examId" element={<Scoped><ExamBuilder /></Scoped>} />
+                <Route path="exams/:examId/evaluation" element={<Scoped><EvaluationSheetAdmin /></Scoped>} />
+                <Route path="exams/:examId/results" element={<Scoped><Results /></Scoped>} />
+                <Route path="exams/:examId/live" element={<Scoped><Live /></Scoped>} />
+                <Route path="live" element={<Scoped><LiveHub /></Scoped>} />
+                <Route path="coordinator" element={<CoordinatorPortal />} />
+                <Route path="exams/:examId/preview" element={<Scoped><Preview /></Scoped>} />
+                <Route path="usage" element={isSuper ? <Usage /> : <Navigate to="/console" replace />} />
+                <Route path="integrations" element={<Integrations />} />
+                <Route path="moodle" element={<Scoped><MoodleWorkspace collegeId={collegeId} /></Scoped>} />
+                <Route path="leaderboard" element={<Scoped><Leaderboard /></Scoped>} />
+                <Route path="announcements" element={<Announcements />} />
+                <Route path="account" element={<Account />} />
+                <Route path="*" element={<Navigate to="/console" replace />} />
+              </Routes>
+            </Suspense>
           )}
           <Credit />
         </main>

@@ -3,6 +3,8 @@ import { api, download } from "../../lib/api.js";
 import { useAdmin } from "./context.jsx";
 import { useToast } from "../../components/ui.jsx";
 
+import { ScoreDistributionChart } from "../../components/ui/analytics-charts.jsx";
+
 export default function AssessmentAnalytics({ examId }) {
   const { collegeId, cq } = useAdmin();
   const toast = useToast();
@@ -28,13 +30,7 @@ export default function AssessmentAnalytics({ examId }) {
         {!data.completed && <p>No completed attempts yet. Statistics appear after submissions.</p>}
         {data.zero_maximum_attempts > 0 && <p role="status">{data.zero_maximum_attempts} attempts with no available marks are excluded from percentage statistics.</p>}
         <h3>Score distribution</h3>
-        <div className="analytics-distribution">
-          {data.distribution.map(bin => <div key={bin.range} className="analytics-bin">
-            <span className="small">{bin.range}</span>
-            <meter min="0" max={Math.max(1, data.completed)} value={bin.count} aria-label={`${bin.range}: ${bin.count} participants`} />
-            <strong>{bin.count}</strong>
-          </div>)}
-        </div>
+        <ScoreDistributionChart data={data.distribution} height={220} />
         <div className="row tight" style={{ margin: "16px 0" }}>
           {[["questions", "Question CSV"], ["topics", "Topic CSV"], ["distribution", "Distribution CSV"]].map(([kind, label]) =>
             <button className="btn sm" key={kind} onClick={() => exportData(kind)}>{label}</button>)}

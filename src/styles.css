@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* Zyphor design system */
 :root {
   /* Zyphor brand */

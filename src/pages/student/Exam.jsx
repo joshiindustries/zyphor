@@ -48,6 +48,7 @@ export default function Exam() {
   const [submitting, setSubmitting] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [saveLabel, setSaveLabel] = useState("");
+  const [saveStatus, setSaveStatus] = useState("saved");
   const [heartbeatAt, setHeartbeatAt] = useState(null);
   const [heartbeatError, setHeartbeatError] = useState("");
   const [judgeLanguages, setJudgeLanguages] = useState([]);
@@ -325,12 +326,18 @@ export default function Exam() {
   /* ── Saving answers ──────────────────────────────────────────────── */
   const saveMcq = useCallback((itemId, next) => {
     cancelRetry(`mcq:${itemId}`);
+    setSaveStatus("saving");
+    setSaveLabel("Saving…");
     savingRef.current = savingRef.current
-      .then(() => { setSaveLabel("Saving…"); return examApi("PUT", `/mcq/${itemId}`,
-        { selected: next.selected, marked_for_review: next.review }); })
-      .then(() => setSaveLabel("Saved " + new Date().toLocaleTimeString()))
+      .then(() => examApi("PUT", `/mcq/${itemId}`,
+        { selected: next.selected, marked_for_review: next.review }))
+      .then(() => {
+        setSaveStatus("saved");
+        setSaveLabel("Saved " + new Date().toLocaleTimeString());
+      })
       .catch((err) => {
         if (err.status !== 409) {
+          setSaveStatus("retrying");
           setSaveLabel("Not saved · reconnect to retry");
           toast("Couldn't save your answer: " + err.message + ". It will retry.", "error");
           retryLater(`mcq:${itemId}`, () => saveMcq(itemId, next));
@@ -347,12 +354,17 @@ export default function Exam() {
 
     setCode((prev) => ({ ...prev, [item.item_id]: { ...prev[item.item_id], dirty: false } }));
     const body = { language: st.language, code: st.drafts[st.language] || "" };
+    setSaveStatus("saving");
     setSaveLabel("Saving…");
     savingRef.current = savingRef.current
       .then(() => examApi("PUT", `/code/${item.item_id}`, body))
-      .then(() => setSaveLabel("Saved " + new Date().toLocaleTimeString()))
+      .then(() => {
+        setSaveStatus("saved");
+        setSaveLabel("Saved " + new Date().toLocaleTimeString());
+      })
       .catch((err) => {
         setCode((prev) => ({ ...prev, [item.item_id]: { ...prev[item.item_id], dirty: true } }));
+        setSaveStatus("retrying");
         setSaveLabel("Not saved");
         if (err.status !== 409) retryLater(`code:${item.item_id}`, () => saveCode(false));
       });
@@ -380,27 +392,25 @@ export default function Exam() {
     }
   }, [hdr, finish, handleConflict]);
 
-  /* ── Timers ──────────────────────────────────────────────────────── */
+  /* ── Timers & Expiration ─────────────────────────────────────────── */
   const autoSubmitting = useRef(false);
+  const handleTimeUp = useCallback(() => {
+    if (autoSubmitting.current) return;
+    autoSubmitting.current = true;
+    saveCode(true).finally(() => flushSaves().finally(() =>
+      examApi("POST", "/submit")
+        .then(() => finish("Time is up. Your exam was submitted automatically."))
+        .catch(() => heartbeat())
+    ));
+  }, [saveCode, flushSaves, examApi, finish, heartbeat]);
+
   useEffect(() => {
     if (phase !== "running") return undefined;
-    const tick = setInterval(() => {
-      const secs = Math.max(0, (deadlineRef.current - Date.now()) / 1000);
-      setLeft(secs);
-      if (secs <= 0 && !autoSubmitting.current) {
-        autoSubmitting.current = true;
-        saveCode(true).finally(() => flushSaves().finally(() =>
-          examApi("POST", "/submit")
-            .then(() => finish("Time is up. Your exam was submitted automatically."))
-            .catch(() => heartbeat())
-        ));
-      }
-    }, 500);
     heartbeat();
     const hb = setInterval(heartbeat, 20000);
     const autosave = setInterval(() => saveCode(false), 15000);
-    return () => { clearInterval(tick); clearInterval(hb); clearInterval(autosave); };
-  }, [phase, saveCode, examApi, finish, heartbeat, flushSaves]);
+    return () => { clearInterval(hb); clearInterval(autosave); };
+  }, [phase, saveCode, heartbeat]);
 
   /* ── Anti-cheat listeners ────────────────────────────────────────── */
   useEffect(() => {
@@ -648,12 +658,15 @@ export default function Exam() {
       <div className="exam-shell" style={{ gridTemplateRows: "auto " + (examPaused ? "auto " : "") + (paper.exam.mediapipe_enabled ? "auto " : "") + "minmax(0, 1fr)" }}>
         <ExamHeader
           paper={paper}
+          deadline={deadlineRef.current}
           left={left}
+          onExpire={handleTimeUp}
           violations={violations}
           maxViolations={maxViol}
           heartbeatAt={heartbeatAt}
           heartbeatError={heartbeatError}
           saveLabel={saveLabel}
+          saveStatus={saveStatus}
           user={user}
           examPaused={examPaused}
           onTogglePalette={setPaletteOpen}
