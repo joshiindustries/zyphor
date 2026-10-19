@@ -160,6 +160,7 @@ export default function Dashboard() {
             {user?.college && <> · {isEvent ? "Event" : "College"} code <strong>{user.college.code}</strong></>}
           </span>
           <button className="btn sm" onClick={() => setShowPassport(true)}>Skill Passport</button>
+          <Link className="btn sm" to="/student/teams">Teams</Link>
           <Link className="btn sm" to="/moodle">Moodle Learning Hub</Link>
           <button className="btn sm" onClick={() => setShowPwd(true)}>Change password</button>
           <ThemeToggle className="btn ghost sm" />

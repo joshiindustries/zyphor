@@ -10,6 +10,7 @@ import Login from "./pages/Login.jsx";
 import AccountAccess from "./pages/AccountAccess.jsx";
 import Console from "./pages/admin/Console.jsx";
 import StudentDashboard from "./pages/student/Dashboard.jsx";
+import Teams from "./pages/student/Teams.jsx";
 import CoordinatorDashboard from "./pages/coordinator/CoordinatorDashboard.jsx";
 import { PublicSkillPassport } from "./pages/student/SkillPassport.jsx";
 import AccessibilitySettings from "./components/AccessibilitySettings.jsx";
@@ -68,6 +69,7 @@ function PrivateApp() {
                 </RequireRole>
               }
             />
+            <Route path="/student/teams" element={<RequireRole roles={["student"]}><Teams /></RequireRole>} />
             <Route path="/coordinator" element={<RequireRole roles={["coordinator"]}><CoordinatorDashboard /></RequireRole>} />
             <Route
               path="/exam/:examId"

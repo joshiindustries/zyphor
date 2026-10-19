@@ -25,6 +25,8 @@ import CoordinatorPortal from "./CoordinatorPortal.jsx";
 import EvaluationSheetAdmin from "./EvaluationSheetAdmin.jsx";
 import CoordinatorManagement from "./CoordinatorManagement.jsx";
 import Templates from "./Templates.jsx";
+import TeamRegistrations from "./TeamRegistrations.jsx";
+import EmailDeliveries from "./EmailDeliveries.jsx";
 import { MoodleWorkspace } from "../MoodlePortal.jsx";
 
 export default function Console() {
@@ -109,7 +111,10 @@ export default function Console() {
     { id: "moodle", to: "/console/moodle", label: "Moodle Learning Hub" },
     { group: isSuper ? "Selected college / event" : org?.org_type === "event" ? "Event" : "College" },
     { id: "students", to: "/console/students", label: "Students" },
+    ...(org?.org_type === "event" && (isSuper || user.role === "college_admin")
+      ? [{ id: "team-registrations", to: "/console/team-registrations", label: "Team registrations" }] : []),
     { id: "exams", to: "/console/exams", label: "Exams & Results" },
+    { id: "email-deliveries", to: "/console/email-deliveries", label: "Email delivery queue" },
     { id: "templates", to: "/console/templates", label: "Templates" },
     { id: "live", to: "/console/live", label: "Live Monitor" },
     { id: "coordinator", to: "/console/coordinator", label: "Coordinator Portal" },
@@ -199,6 +204,9 @@ export default function Console() {
               <Route path="colleges" element={isSuper ? <Colleges /> : <Navigate to="/console" replace />} />
               <Route path="coordinators" element={isSuper ? <CoordinatorManagement /> : <Navigate to="/console" replace />} />
               <Route path="students" element={<Scoped><Students /></Scoped>} />
+              <Route path="team-registrations" element={(isSuper || user.role === "college_admin")
+                ? <Scoped><TeamRegistrations /></Scoped> : <Navigate to="/console" replace />} />
+              <Route path="email-deliveries" element={<Scoped><EmailDeliveries /></Scoped>} />
               <Route path="mcqs" element={<Mcqs />} />
               <Route path="problems" element={<Problems />} />
               <Route path="exams" element={<Scoped><Exams /></Scoped>} />

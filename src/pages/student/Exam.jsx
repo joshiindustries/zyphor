@@ -12,6 +12,11 @@ import {
   DEFAULT_CODE, VIOLATION_TEXT, buildAnswerState, enterFullscreen, exitFullscreen,
   isAnswered, isFullscreen,
 } from "./examState.js";
+import { ExamHeader, ExamPausedBanner } from "./ExamHeader.jsx";
+import { ExamPalette } from "./ExamPalette.jsx";
+import { ExamContent } from "./ExamContent.jsx";
+import { ExamActions } from "./ExamActions.jsx";
+import { FullscreenOverlay, ViolationWarningModal, InstructionsModal, SubmitConfirmModal } from "./ExamModals.jsx";
 
 export default function Exam() {
   const { examId } = useParams();
@@ -19,7 +24,7 @@ export default function Exam() {
   const navigate = useNavigate();
   const toast = useToast();
 
-  const [phase, setPhase] = useState("loading"); // loading | prestart | running | done | locked
+  const [phase, setPhase] = useState("loading");
   const [info, setInfo] = useState(null);
   const [paper, setPaper] = useState(null);
   const [error, setError] = useState("");
@@ -39,7 +44,7 @@ export default function Exam() {
   const [warning, setWarning] = useState(null);
   const [examPaused, setExamPaused] = useState(false);
   const [showInstr, setShowInstr] = useState(false);
-  const [confirmSubmit, setConfirmSubmit] = useState(null);
+  const [confirmSubmit, setConfirmSubmit] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [saveLabel, setSaveLabel] = useState("");
@@ -80,7 +85,7 @@ export default function Exam() {
   const handleConflict = useCallback((message) => {
     if (finishedRef.current) return;
     if (/paused by the organizers/i.test(message)) {
-      setExamPaused(true);  // not final — the exam resumes with the time they had left intact
+      setExamPaused(true);
       return;
     }
     if (/another window|another device|one session/i.test(message)) {
@@ -96,8 +101,7 @@ export default function Exam() {
   const examApi = useCallback((method, path, body) =>
     api(method, `/api/zyphor/student/attempts/${attemptRef.current}${path}`, body, hdr())
       .catch((err) => { if (err.status === 409) handleConflict(err.message); throw err; }),
-    [hdr, handleConflict]
-  );
+  [hdr, handleConflict]);
 
   // One pending retry per answer (key), so a second failed save never cancels the first one's retry
   const retryLater = useCallback((key, fn) => {
@@ -133,7 +137,6 @@ export default function Exam() {
         finish("Your exam was submitted automatically because of repeated violations.");
         return;
       }
-      // The fullscreen overlay already explains that case.
       if (r.counted && !(type === "fullscreen_exit" && R.current.paper?.exam.require_fullscreen)) {
         setWarning({ type, left: r.max_violations - r.violations });
       }
@@ -141,6 +144,95 @@ export default function Exam() {
       if (err.status === 409) handleConflict(err.message);
     }
   }, [hdr, finish, handleConflict]);
+
+  /* ── Handler functions for child components (must be before early returns) ───────── */
+  const handleMcqChange = useCallback((item, optionId, checked, isMulti) => {
+    const prev = mcq[item.item_id] || { selected: [], review: false };
+    const selected = isMulti
+      ? (checked ? [...prev.selected, optionId] : prev.selected.filter((x) => x !== optionId))
+      : [optionId];
+    const next = { ...prev, selected };
+    setMcq((m) => ({ ...m, [item.item_id]: next }));
+    saveMcq(item.item_id, next);
+  }, [mcq, saveMcq]);
+
+  const handleCodeChange = useCallback((itemId, value) => {
+    setCode((c) => {
+      const st = c[itemId];
+      return {
+        ...c,
+        [itemId]: {
+          ...st,
+          touched: true,
+          dirty: true,
+          drafts: { ...st.drafts, [st.language]: value },
+        },
+      };
+    });
+  }, []);
+
+  const handleLanguageChange = useCallback((itemId, lang) => {
+    setCode((c) => {
+      const st = c[itemId];
+      const next = st.drafts[lang] ?? (paper?.exam?.starter_code?.[lang] ?? DEFAULT_CODE[lang] ?? "");
+      return {
+        ...c,
+        [itemId]: {
+          ...st, language: lang, dirty: true,
+          drafts: { ...st.drafts, [lang]: next },
+        },
+      };
+    });
+  }, [paper?.exam?.starter_code]);
+
+  const handleRunCode = useCallback(async (itemId, language, value, customInput, languageId) => {
+    if (paper?.exam?.judge0_enabled) {
+      const selected = judgeLanguages.find((x) => x.alias === language);
+      if (!selected) throw new Error("This language is unavailable in Judge0.");
+      await examApi("PUT", `/code/${itemId}`, { language, code: value });
+      return api("POST", `/api/zyphor/integrations/attempts/${attemptRef.current}/items/${itemId}/execute`,
+        { language_id: selected.id, language, source_code: value,
+          stdin: customInput || "", custom_input: customInput !== null }, hdr());
+    }
+    const body = { language, code: value };
+    if (customInput !== null) body.custom_input = customInput;
+    return examApi("POST", `/code/${itemId}/run`, body);
+  }, [paper?.exam?.judge0_enabled, judgeLanguages, examApi, hdr]);
+
+  const handleSubmitCode = useCallback(async (itemId, language, value, languageId) => {
+    if (paper?.exam?.judge0_enabled) {
+      const selected = judgeLanguages.find((x) => x.alias === language);
+      if (!selected) throw new Error("This language is unavailable in Judge0.");
+      await examApi("PUT", `/code/${itemId}`, { language, code: value });
+      const r = await api("POST", `/api/zyphor/integrations/attempts/${attemptRef.current}/items/${itemId}/execute`,
+        { language_id: selected.id, language, source_code: value, submit: true }, hdr());
+      setCode((c) => ({
+        ...c,
+        [itemId]: { ...c[itemId], result: r, dirty: false, touched: true },
+      }));
+      return r;
+    }
+    const r = await examApi("POST", `/code/${itemId}/submit`, { language, code: value });
+    setCode((c) => ({
+      ...c,
+      [itemId]: { ...c[itemId], result: r, dirty: false, touched: true },
+    }));
+    return r;
+  }, [paper?.exam?.judge0_enabled, judgeLanguages, examApi, hdr]);
+
+  const handleClearResponse = useCallback((itemId) => {
+    const next = { ...mcq[itemId], selected: [] };
+    setMcq((m) => ({ ...m, [itemId]: next }));
+    saveMcq(itemId, next);
+  }, [mcq, saveMcq]);
+
+  const handleToggleReview = useCallback((itemId) => {
+    const prev = mcq[itemId] || { selected: [], review: false };
+    const next = { ...prev, review: !prev.review };
+    setMcq((m) => ({ ...m, [itemId]: next }));
+    saveMcq(itemId, next);
+    if (next.review && index < (paper?.items?.length || 0) - 1) go(index + 1);
+  }, [mcq, saveMcq, index, paper, go]);
 
   /* ── Load pre-start info ─────────────────────────────────────────── */
   const loadInfo = useCallback(async (cancelledRef) => {
@@ -168,8 +260,7 @@ export default function Exam() {
     return () => { cancelledRef.current = true; };
   }, [loadInfo]);
 
-  // While waiting for the organizers to open or resume it, check back on our own —
-  // no need for the student to reload the page.
+  // While waiting for the organizers to open or resume it, check back on our own
   useEffect(() => {
     if (phase !== "prestart" || !info || info.window === "live") return undefined;
     const cancelledRef = { current: false };
@@ -233,7 +324,7 @@ export default function Exam() {
 
   /* ── Saving answers ──────────────────────────────────────────────── */
   const saveMcq = useCallback((itemId, next) => {
-    cancelRetry(`mcq:${itemId}`);  // this newer answer replaces any older one still waiting to retry
+    cancelRetry(`mcq:${itemId}`);
     savingRef.current = savingRef.current
       .then(() => { setSaveLabel("Saving…"); return examApi("PUT", `/mcq/${itemId}`,
         { selected: next.selected, marked_for_review: next.review }); })
@@ -298,7 +389,6 @@ export default function Exam() {
       setLeft(secs);
       if (secs <= 0 && !autoSubmitting.current) {
         autoSubmitting.current = true;
-        // Answers still being saved go first; the server accepts them for a short grace period
         saveCode(true).finally(() => flushSaves().finally(() =>
           examApi("POST", "/submit")
             .then(() => finish("Time is up. Your exam was submitted automatically."))
@@ -306,8 +396,6 @@ export default function Exam() {
         ));
       }
     }, 500);
-    // Every open exam checks in once a minute: enough to resync the timer and show who's online,
-    // while keeping a full hall from loading the server with background traffic
     heartbeat();
     const hb = setInterval(heartbeat, 20000);
     const autosave = setInterval(() => saveCode(false), 15000);
@@ -339,7 +427,6 @@ export default function Exam() {
       if (document.hidden) violation("tab_switch", "Page hidden");
     });
     on(window, "blur", () => {
-      // Alt-tabbing to another app blurs the window; clicking inside the page does not.
       setTimeout(() => {
         if (!document.hasFocus() && !document.hidden) {
           violation("window_blur", "Focus moved to another window");
@@ -351,7 +438,6 @@ export default function Exam() {
       on(document, "copy", (e) => { e.preventDefault(); violation("copy_attempt"); }, true);
       on(document, "cut", (e) => { e.preventDefault(); violation("copy_attempt", "cut"); }, true);
       on(document, "paste", (e) => {
-        // The editor cancels its own pastes; this catches everything else.
         if (!e.target.closest || !e.target.closest(".cm-editor")) {
           e.preventDefault(); violation("paste_attempt");
         }
@@ -553,242 +639,93 @@ export default function Exam() {
   }
 
   /* ── Render: running ─────────────────────────────────────────────── */
-  const sections = paper.sections;
-  const answeredCount = paper.items.filter((it) => isAnswered(it, mcq, code)).length;
-  const maxViol = paper.exam.max_violations;
+  const sections = paper?.sections || [];
+  const answeredCount = paper?.items?.filter((it) => isAnswered(it, mcq, code)).length || 0;
+  const maxViol = paper?.exam?.max_violations || 0;
 
   return (
     <>
       <div className="exam-shell" style={{ gridTemplateRows: "auto " + (examPaused ? "auto " : "") + (paper.exam.mediapipe_enabled ? "auto " : "") + "minmax(0, 1fr)" }}>
-        <div className="exam-head">
-          <button className="btn sm menu-toggle" onClick={() => setPaletteOpen((o) => !o)}
-                  aria-label="Questions">☰</button>
-          <div className="title"><span className="workspace-eyebrow">ASSESSMENT WORKSPACE</span>{paper.exam.title}</div>
-          <ExamConnectionStatus heartbeatAt={heartbeatAt} heartbeatError={heartbeatError} />
-          <span className="save-status" role="status">{saveLabel || "Answers save automatically"}</span>
-          <span className="small muted">{user.name} · {user.roll_no}</span>
-          {violations
-            ? <Badge color={violations >= maxViol - 1 ? "red" : "amber"}>⚠ {violations}/{maxViol} violations</Badge>
-            : <Badge color="green">No violations</Badge>}
-          <span className={"timer" + (left <= 300 ? " low" : left <= 600 ? " warn" : "")}>
-            {fmtDuration(left)}
-          </span>
-          <button className="btn sm" onClick={() => setShowInstr(true)}>Instructions</button>
-          <button className="btn danger solid sm" disabled={submitting}
-                  onClick={async () => { await saveCode(true); setConfirmSubmit(true); }}>
-            Submit exam
-          </button>
-        </div>
+        <ExamHeader
+          paper={paper}
+          left={left}
+          violations={violations}
+          maxViolations={maxViol}
+          heartbeatAt={heartbeatAt}
+          heartbeatError={heartbeatError}
+          saveLabel={saveLabel}
+          user={user}
+          examPaused={examPaused}
+          onTogglePalette={setPaletteOpen}
+          onShowInstructions={() => setShowInstr(true)}
+          onSubmit={() => { saveCode(true); setConfirmSubmit(true); }}
+          submitting={submitting}
+          paletteOpen={paletteOpen}
+        />
+        {examPaused && <ExamPausedBanner />}
 
-        {examPaused && (
-          <div className="banner warn" style={{ margin: "0 0 10px" }}>
-            <div>
-              <h3 style={{ margin: 0 }}>Exam paused</h3>
-              <span className="small">
-                The organizers have paused this exam. Your answers are saved and your time isn't
-                running out — just wait, this will resume on its own.
-              </span>
-            </div>
-          </div>
+        {paper.exam.mediapipe_enabled && (
+          <MediaPipeMonitor
+            attemptId={paper.attempt_id}
+            session={sessionRef.current}
+            policy={info?.mediapipe_policy || {}}
+            onMultipleFaces={(count) => violation("multiple_faces", `More than one face detected (${count})`)}
+            onBlocked={(type) => finish(
+              type === "multiple_faces" ? "More than one face detected. Your exam was submitted."
+              : type === "no_face" ? "No face could be verified. Your exam was submitted."
+              : "Camera monitoring could not be verified. Your exam was submitted."
+            )}
+          />
         )}
 
-        {paper.exam.mediapipe_enabled && <MediaPipeMonitor attemptId={paper.attempt_id} session={sessionRef.current} policy={info?.mediapipe_policy || {}} onMultipleFaces={(count) => violation("multiple_faces", `More than one face detected (${count})`)} onBlocked={(type) => finish(type === "multiple_faces" ? "More than one face detected. Your exam was submitted." : type === "no_face" ? "No face could be verified. Your exam was submitted." : "Camera monitoring could not be verified. Your exam was submitted.")} />}
-
         <div className="exam-body">
-          <aside className={"palette" + (paletteOpen ? " open" : "")} aria-label="Question navigation">
-            <div className="palette-summary"><span className="workspace-eyebrow">YOUR PROGRESS</span><strong>{answeredCount}<small> / {paper.items.length} answered</small></strong><progress value={answeredCount} max={paper.items.length} aria-label="Questions answered" /></div>
-            {sections.map((sec) => (
-              <div key={sec}>
-                <h4>{sec}</h4>
-                <div className="pal-grid">
-                  {paper.items.map((it, i) => it.section !== sec ? null : (
-                    <button
-                      key={it.item_id}
-                      aria-label={`Question ${it.number}, ${isAnswered(it, mcq, code) ? "answered" : "unanswered"}${it.type === "mcq" && mcq[it.item_id]?.review ? ", marked for review" : ""}`}
-                      aria-current={i === index ? "step" : undefined}
-                      className={[
-                        "pal-btn",
-                        isAnswered(it, mcq, code) ? "answered" : visited.has(it.item_id) ? "visited" : "",
-                        it.type === "mcq" && mcq[it.item_id]?.review ? "review" : "",
-                        i === index ? "current" : "",
-                      ].filter(Boolean).join(" ")}
-                      onClick={() => { go(i); setPaletteOpen(false); }}
-                    >
-                      {it.number}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-            <div className="legend">
-              <span style={{ "--c": "var(--success)" }}>Answered ({answeredCount})</span>
-              <span style={{ "--c": "var(--danger-soft)" }}>
-                Not answered ({paper.items.filter((it) => visited.has(it.item_id) && !isAnswered(it, mcq, code)).length})
-              </span>
-              <span style={{ "--c": "var(--surface-3)" }}>
-                Not visited ({paper.items.filter((it) => !visited.has(it.item_id)).length})
-              </span>
-              <span style={{ "--c": "var(--violet)" }}>
-                For review ({paper.items.filter((it) => it.type === "mcq" && mcq[it.item_id]?.review).length})
-              </span>
-            </div>
-          </aside>
+          <ExamPalette
+            paper={paper}
+            mcq={mcq}
+            code={code}
+            index={index}
+            visited={visited}
+            sections={sections}
+            answeredCount={answeredCount}
+            onNavigate={go}
+            onToggle={setPaletteOpen}
+            paletteOpen={paletteOpen}
+          />
 
-          <section className={"content" + (item.type === "coding" ? " is-coding" : "")}>
-            <div className="q-wrap">
-              <div className="q-head">
-                <div>
-                  <span className="q-num">Question {item.number} / {paper.items.length}</span>
-                  <div className="strong" style={{ fontSize: 15, marginTop: 1 }}>{item.section}</div>
-                </div>
-                <div className="row tight small">
-                  <Badge color="green">+{item.marks} marks</Badge>
-                  {item.type === "mcq" && item.negative_marks > 0 &&
-                    <Badge color="red">−{item.negative_marks} if wrong</Badge>}
-                  {item.type === "mcq" && item.is_multi && <Badge color="blue">Select all that apply</Badge>}
-                </div>
-              </div>
-
-              {item.type === "mcq" ? (
-                <div className="card">
-                  <Markdown style={{ fontSize: 15.5, lineHeight: 1.6 }}>{item.question_text}</Markdown>
-                  <ul className="options">
-                    {item.options.map((o, i) => {
-                      const st = mcq[item.item_id];
-                      const checked = st.selected.includes(o.id);
-                      return (
-                        <li key={o.id}>
-                          <label className={checked ? "chosen" : ""}>
-                            <input
-                              type={item.is_multi ? "checkbox" : "radio"}
-                              name={`opt-${item.item_id}`}
-                              checked={checked}
-                              onChange={(e) => {
-                                const prev = mcq[item.item_id];
-                                const selected = item.is_multi
-                                  ? (e.target.checked
-                                      ? [...prev.selected, o.id]
-                                      : prev.selected.filter((x) => x !== o.id))
-                                  : [o.id];
-                                const next = { ...prev, selected };
-                                setMcq((m) => ({ ...m, [item.item_id]: next }));
-                                saveMcq(item.item_id, next);
-                              }}
-                            />
-                            <span><strong>{String.fromCharCode(65 + i)}.</strong> {o.text}</span>
-                          </label>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              ) : (
-                <CodingPanel
-                  key={item.item_id}
-                  item={item}
-                  state={code[item.item_id]}
-                  langs={paper.exam.allowed_languages}
-                  blockPaste={paper.exam.block_copy_paste}
-                  saveLabel={saveLabel}
-                  judge0Enabled={paper.exam.judge0_enabled}
-                  judgeLanguages={judgeLanguages}
-                  onPasteBlocked={() => violation("paste_attempt", "Paste into code editor")}
-                  onChange={(value) =>
-                    setCode((c) => {
-                      const st = c[item.item_id];
-                      return {
-                        ...c,
-                        [item.item_id]: {
-                          ...st,
-                          touched: true,
-                          dirty: true,
-                          drafts: { ...st.drafts, [st.language]: value },
-                        },
-                      };
-                    })
-                  }
-                  onLanguageChange={(lang) =>
-                    setCode((c) => {
-                      const st = c[item.item_id];
-                      const next = st.drafts[lang] ?? item.starter_code?.[lang] ?? DEFAULT_CODE[lang] ?? "";
-                      return {
-                        ...c,
-                        [item.item_id]: {
-                          ...st, language: lang, dirty: true,
-                          drafts: { ...st.drafts, [lang]: next },
-                        },
-                      };
-                    })
-                  }
-                  onRun={async (language, value, customInput) => {
-                    if (paper.exam.judge0_enabled) {
-                      const selected = judgeLanguages.find((x) => x.alias === language);
-                      if (!selected) throw new Error("This language is unavailable in Judge0.");
-                      await examApi("PUT", `/code/${item.item_id}`, { language, code: value });
-                      return api("POST", `/api/zyphor/integrations/attempts/${attemptRef.current}/items/${item.item_id}/execute`,
-                        { language_id: selected.id, language, source_code: value,
-                          stdin: customInput || "", custom_input: customInput !== null }, hdr());
-                    }
-                    const body = { language, code: value };
-                    if (customInput !== null) body.custom_input = customInput;
-                    return examApi("POST", `/code/${item.item_id}/run`, body);
-                  }}
-                  onSubmit={async (language, value) => {
-                    if (paper.exam.judge0_enabled) {
-                      const selected = judgeLanguages.find((x) => x.alias === language);
-                      if (!selected) throw new Error("This language is unavailable in Judge0.");
-                      await examApi("PUT", `/code/${item.item_id}`, { language, code: value });
-                      const r = await api("POST", `/api/zyphor/integrations/attempts/${attemptRef.current}/items/${item.item_id}/execute`,
-                        { language_id: selected.id, language, source_code: value, submit: true }, hdr());
-                      setCode((c) => ({
-                        ...c,
-                        [item.item_id]: { ...c[item.item_id], result: r, dirty: false, touched: true },
-                      }));
-                      return r;
-                    }
-                    const r = await examApi("POST", `/code/${item.item_id}/submit`, { language, code: value });
-                    setCode((c) => ({
-                      ...c,
-                      [item.item_id]: { ...c[item.item_id], result: r, dirty: false, touched: true },
-                    }));
-                    return r;
-                  }}
-                />
-              )}
-            </div>
-          </section>
+          <ExamContent
+            item={item}
+            index={index}
+            totalItems={paper.items.length}
+            paper={paper}
+            mcq={mcq}
+            code={code}
+            onMcqChange={handleMcqChange}
+            onCodeChange={handleCodeChange}
+            onLanguageChange={handleLanguageChange}
+            onRunCode={handleRunCode}
+            onSubmitCode={handleSubmitCode}
+            judge0Enabled={paper.exam.judge0_enabled}
+            judgeLanguages={judgeLanguages}
+            allowedLanguages={paper.exam.allowed_languages}
+            blockPaste={paper.exam.block_copy_paste}
+            saveLabel={saveLabel}
+            onPasteBlocked={() => violation("paste_attempt", "Paste into code editor")}
+          />
         </div>
 
-        <div className="q-actions">
-          <div className="row tight">
-            <button className="btn" disabled={index === 0} onClick={() => go(index - 1)}>‹ Previous</button>
-            {item.type === "mcq" && (
-              <>
-                <button className="btn" onClick={() => {
-                  const next = { ...mcq[item.item_id], selected: [] };
-                  setMcq((m) => ({ ...m, [item.item_id]: next }));
-                  saveMcq(item.item_id, next);
-                }}>Clear response</button>
-                <button className="btn" onClick={() => {
-                  const prev = mcq[item.item_id];
-                  const next = { ...prev, review: !prev.review };
-                  setMcq((m) => ({ ...m, [item.item_id]: next }));
-                  saveMcq(item.item_id, next);
-                  if (next.review && index < paper.items.length - 1) go(index + 1);
-                }}>
-                  {mcq[item.item_id]?.review ? "Unmark review" : "Mark for review & next"}
-                </button>
-              </>
-            )}
-          </div>
-          <button className="btn primary" onClick={() => {
-            saveCode(false);
-            if (index < paper.items.length - 1) go(index + 1);
-            else toast("Save requested. Check the save status above.", "info", 2500);
-          }}>
-            {index === paper.items.length - 1 ? "Save" : "Save & next ›"}
-          </button>
-        </div>
+        <ExamActions
+          index={index}
+          totalItems={paper.items.length}
+          item={item}
+          mcq={mcq}
+          paper={paper}
+          code={code}
+          onNavigate={go}
+          onClearResponse={handleClearResponse}
+          onToggleReview={handleToggleReview}
+          saveCode={saveCode}
+          toast={toast}
+        />
       </div>
 
       <div className="watermark" aria-hidden="true">
@@ -796,45 +733,39 @@ export default function Exam() {
       </div>
 
       {showFsOverlay && (
-        <div className="overlay">
-          <div className="box">
-            <h2>⚠ You left fullscreen</h2>
-            <p>This has been recorded as a violation (<strong>{violations}/{maxViol}</strong>).
-               Your timer is still running.</p>
-            <p>Return to fullscreen to continue your exam.</p>
-            <button className="btn primary" onClick={async () => {
-              try { await enterFullscreen(); }
-              catch { toast("Fullscreen was blocked by the browser. Try again.", "error"); }
-            }}>Return to fullscreen</button>
-          </div>
-        </div>
+        <FullscreenOverlay
+          violations={violations}
+          maxViol={maxViol}
+          onReturn={async () => {
+            try { await enterFullscreen(); }
+            catch { toast("Fullscreen was blocked by the browser. Try again.", "error"); }
+          }}
+          toast={toast}
+        />
       )}
 
-      {warning && (
-        <Modal title="Warning: violation recorded" narrow onClose={() => setWarning(null)}
-               actions={<button className="btn primary" onClick={() => setWarning(null)}>I understand</button>}>
-          <p><strong>{VIOLATION_TEXT[warning.type] || warning.type}.</strong></p>
-          <p>
-            This has been recorded and reported to the organizers.{" "}
-            {warning.left > 0 && (
-              <><strong>{warning.left}</strong> more violation{warning.left === 1 ? "" : "s"} and your
-              exam will be submitted automatically.</>
-            )}
-          </p>
-        </Modal>
-      )}
+      <ViolationWarningModal
+        warning={warning}
+        maxViol={maxViol}
+        onClose={() => setWarning(null)}
+        VIOLATION_TEXT={VIOLATION_TEXT}
+      />
 
-      {showInstr && (
-        <Modal title="Instructions" onClose={() => setShowInstr(false)}>
-          <Markdown>{paper.exam.instructions || "No additional instructions."}</Markdown>
-          <p className="muted small">Violations so far: {violations} of {maxViol} allowed.</p>
-        </Modal>
-      )}
+      <InstructionsModal
+        show={showInstr}
+        instructions={paper.exam.instructions}
+        violations={violations}
+        maxViol={maxViol}
+        onClose={() => setShowInstr(false)}
+      />
 
       {confirmSubmit && (
-        <SubmitConfirm
-          paper={paper} mcq={mcq} code={code} submitting={submitting}
-          onCancel={() => setConfirmSubmit(null)}
+        <SubmitConfirmModal
+          paper={paper}
+          mcq={mcq}
+          code={code}
+          submitting={submitting}
+          onCancel={() => setConfirmSubmit(false)}
           onConfirm={async () => {
             setSubmitting(true);
             try {
@@ -842,58 +773,11 @@ export default function Exam() {
               await examApi("POST", "/submit");
               finish("Your exam has been submitted.");
             } catch (err) {
-              if (!finishedRef.current) { toast(err.message, "error"); setSubmitting(false); setConfirmSubmit(null); }
+              if (!finishedRef.current) { toast(err.message, "error"); setSubmitting(false); setConfirmSubmit(false); }
             }
           }}
         />
       )}
     </>
-  );
-}
-
-function SubmitConfirm({ paper, mcq, code, submitting, onCancel, onConfirm }) {
-  const items = paper.items;
-  const answered = items.filter((it) => isAnswered(it, mcq, code)).length;
-  const review = items.filter((it) => it.type === "mcq" && mcq[it.item_id]?.review).length;
-  const ungraded = items.filter(
-    (it) => it.type === "coding" && isAnswered(it, mcq, code) && !code[it.item_id]?.result
-  ).length;
-
-  return (
-    <Modal
-      title="Submit exam?"
-      onClose={onCancel}
-      actions={
-        <>
-          <button className="btn" onClick={onCancel} disabled={submitting}>Keep working</button>
-          <button className="btn danger solid" onClick={onConfirm} disabled={submitting}>
-            {submitting ? <><Spinner /> Submitting</> : "Submit exam"}
-          </button>
-        </>
-      }
-    >
-      <div className="table-wrap compact">
-        <table>
-          <thead><tr><th>Section</th><th className="num">Answered</th><th className="num">Not answered</th></tr></thead>
-          <tbody>
-            {paper.sections.map((sec) => {
-              const its = items.filter((i) => i.section === sec);
-              const a = its.filter((it) => isAnswered(it, mcq, code)).length;
-              return (
-                <tr key={sec}><td>{sec}</td><td className="num">{a}</td><td className="num">{its.length - a}</td></tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      <p>{answered} of {items.length} answered{review ? ` · ${review} marked for review` : ""}.</p>
-      {ungraded > 0 && (
-        <p className="small" style={{ color: "var(--warning)" }}>
-          {ungraded} coding answer(s) were not submitted with "Submit code". They will be graded
-          automatically now.
-        </p>
-      )}
-      <p><strong>You can't change your answers after submitting.</strong></p>
-    </Modal>
   );
 }

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { api } from "../../lib/api.js";
 import { LANG_LABELS, fromLocalInput, toLocalInput } from "../../lib/format.js";
 import { Field, Modal, ModalButton, useToast } from "../../components/ui.jsx";
-import { nullIfBlank } from "./context.jsx";
+import { nullIfBlank, useAdmin } from "./context.jsx";
 
 export const EXAM_TYPES = [
   { id: "mcq", label: "MCQ only", hint: "Aptitude, GK, subject tests — any multiple-choice paper" },
@@ -13,6 +13,7 @@ export const EXAM_TYPES = [
 /** Shared by "create exam" and the builder's settings dialog. */
 export default function ExamSettings({ meta, exam, cq, onClose, onSaved }) {
   const toast = useToast();
+  const { isEvent } = useAdmin();
   const now = Date.now();
   const e = exam || {
     duration_minutes: 60,
@@ -22,6 +23,7 @@ export default function ExamSettings({ meta, exam, cq, onClose, onSaved }) {
     require_fullscreen: true, block_copy_paste: true, max_violations: 3,
     show_results: false, show_answers: false, pass_percentage: 40,
     allowed_languages: null, exam_type: "mcq", show_leaderboard: true,
+    team_registration_enabled: false, team_approval_required: false, team_min_size: 1, team_max_size: 10,
   };
 
   const [f, setF] = useState({
@@ -35,6 +37,9 @@ export default function ExamSettings({ meta, exam, cq, onClose, onSaved }) {
     block_copy_paste: e.block_copy_paste, max_violations: e.max_violations,
     show_results: e.show_results, show_answers: e.show_answers,
     exam_type: e.exam_type || "mixed", show_leaderboard: !!e.show_leaderboard,
+    team_registration_enabled: !!e.team_registration_enabled,
+    team_approval_required: !!e.team_approval_required,
+    team_min_size: e.team_min_size || 1, team_max_size: e.team_max_size || 10,
   });
   const [langs, setLangs] = useState(() => new Set(e.allowed_languages || meta.languages));
 
@@ -61,6 +66,9 @@ export default function ExamSettings({ meta, exam, cq, onClose, onSaved }) {
       block_copy_paste: f.block_copy_paste, max_violations: Number(f.max_violations),
       show_results: f.show_results, show_answers: f.show_answers,
       show_leaderboard: f.show_leaderboard, exam_type: f.exam_type,
+      team_registration_enabled: f.team_registration_enabled,
+      team_approval_required: f.team_approval_required,
+      team_min_size: Number(f.team_min_size), team_max_size: Number(f.team_max_size),
       pass_percentage: Number(f.pass_percentage),
       // null means "every language the platform supports"
       allowed_languages: allowed.length === meta.languages.length ? null : allowed,
@@ -160,6 +168,18 @@ export default function ExamSettings({ meta, exam, cq, onClose, onSaved }) {
       <Check name="show_results">Show score to students after they submit</Check>
       <Check name="show_answers">Show correct answers and explanations in the review</Check>
       <Check name="show_leaderboard">Show students a leaderboard (top 10 and their own rank) as soon as they submit</Check>
+
+      {isEvent && <>
+        <h3>Team registration</h3>
+        <Check name="team_registration_enabled">Allow verified student teams to register for this event</Check>
+        {f.team_registration_enabled && <>
+          <Check name="team_approval_required">Require organizer approval for each team</Check>
+          <div className="row tight">
+            <Field label="Minimum team size"><input type="number" min="1" max="50" value={f.team_min_size} onChange={set("team_min_size")} /></Field>
+            <Field label="Maximum team size"><input type="number" min="1" max="50" value={f.team_max_size} onChange={set("team_max_size")} /></Field>
+          </div>
+        </>}
+      </>}
 
       {f.exam_type !== "mcq" && (<>
       <h3>Coding languages allowed</h3>

@@ -23,6 +23,9 @@ export class ApiError extends Error {
 // the build-time VITE_API_BASE, then to this same origin (dev proxy, or a backend serving the site).
 let runtimeBase = null;
 
+// Request deduplication cache for GET requests
+const inflightRequests = new Map();
+
 async function readBackendFile() {
   const r = await fetch(`${import.meta.env.BASE_URL}backend.json`, { cache: "no-store" });
   if (!r.ok) return null;
@@ -75,6 +78,30 @@ function errorMessage(data, status) {
 /** Fired on 401 so the router can bounce to the login screen. */
 export const onUnauthorized = { handler: null };
 
+/**
+ * Creates a deduplication key for a request.
+ * Only GET requests with the same path and query params are deduplicated.
+ */
+function dedupeKey(method, path, body) {
+  if (method !== "GET") return null;
+  return `${method}:${path}:${JSON.stringify(body || {})}`;
+}
+
+/**
+ * Main API function with retry logic, backend failover, and request deduplication.
+ * @param {string} method - HTTP method
+ * @param {string} path - API path
+ * @param {any} body - Request body
+ * @param {Object} opts - Options
+ * @param {boolean} opts.retry - Whether to retry on failure (default: true for GET)
+ * @param {number} opts.timeoutMs - Request timeout in ms (default: 45000)
+ * @param {boolean} opts.keepalive - Use keepalive for fetch
+ * @param {boolean} opts.raw - Return raw Response instead of parsed JSON
+ * @param {boolean} opts.noRedirect - Don't redirect on 401
+ * @param {Object} opts.headers - Additional headers
+ * @param {AbortSignal} opts.signal - External abort signal
+ * @param {boolean} opts.dedupe - Enable request deduplication for GET (default: true)
+ */
 export async function api(method, path, body, opts = {}) {
   const headers = { ...(opts.headers || {}) };
   const token = auth.token();
@@ -87,27 +114,57 @@ export async function api(method, path, body, opts = {}) {
     payload = JSON.stringify(body);
   }
 
+  // Request deduplication for GET requests
+  const dedupe = opts.dedupe !== false && method === "GET";
+  const key = dedupe ? dedupeKey(method, path, body) : null;
+
+  if (key && inflightRequests.has(key)) {
+    return inflightRequests.get(key);
+  }
+
   // Reads (and calls marked safe to repeat) retry through a dropped connection or a busy server,
   // which is what a whole lab signing in at once looks like.
   const attempts = method === "GET" || opts.retry ? 4 : 1;
   let res;
   let followed = false;  // re-read backend.json at most once per call
-  for (let attempt = 1; ; attempt++) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), opts.timeoutMs || 45000);
+
+  const controller = new AbortController();
+  const timeoutMs = opts.timeoutMs || 45000;
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  // Allow external signal to abort our request
+  if (opts.signal) {
+    opts.signal.addEventListener("abort", () => controller.abort());
+  }
+
+  const executeRequest = async (attempt) => {
     try {
       res = await fetch(apiBase() + path, { method, headers, body: payload, keepalive: !!opts.keepalive, signal: controller.signal });
       // 530: Cloudflare can't reach the tunnel - the server restarted under a new address
-      if (res.status === 530 && !followed && await backendMoved()) { followed = true; attempt = 0; continue; }
-      if (![502, 503, 504].includes(res.status) || attempt >= attempts) break;
+      if (res.status === 530 && !followed && await backendMoved()) { followed = true; return executeRequest(1); }
+      if (![502, 503, 504].includes(res.status) || attempt >= attempts) return res;
     } catch (error) {
       if (error.name === "AbortError") throw new ApiError(0, "The request timed out. Please check the status before trying again.");
       // The old address is gone: if the server has moved, the request never reached it, so it's safe to resend
-      if (!followed && await backendMoved()) { followed = true; attempt = 0; continue; }
+      if (!followed && await backendMoved()) { followed = true; return executeRequest(1); }
       if (attempt >= attempts) throw new ApiError(0, "Cannot reach the server. Check your connection.");
     }
     finally { clearTimeout(timeout); }
     await new Promise((r) => setTimeout(r, 400 * 2 ** (attempt - 1) + Math.random() * 300));
+    return executeRequest(attempt + 1);
+  };
+
+  try {
+    const promise = executeRequest(1);
+
+    if (dedupe && key) {
+      inflightRequests.set(key, promise);
+      promise.finally(() => inflightRequests.delete(key));
+    }
+
+    res = await promise;
+  } finally {
+    clearTimeout(timeout);
   }
 
   if (opts.raw) {
@@ -153,7 +210,7 @@ export function downloadCSV(filename, header, rows) {
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const text = [header, ...rows].map((r) => r.map(cell).join(",")).join("\r\n");
-  const url = URL.createObjectURL(new Blob(["﻿" + text], { type: "text/csv" }));
+  const url = URL.createObjectURL(new Blob(["\uFEFF" + text], { type: "text/csv" }));
   const a = document.createElement("a");
   a.href = url; a.download = filename;
   document.body.appendChild(a); a.click(); a.remove();
@@ -161,3 +218,8 @@ export function downloadCSV(filename, header, rows) {
 }
 
 export const homeFor = (role) => role === "student" ? "/student" : role === "coordinator" ? "/coordinator" : "/console";
+
+/** Clear all inflight request cache (useful for logout or major state changes) */
+export function clearInflightCache() {
+  inflightRequests.clear();
+}
