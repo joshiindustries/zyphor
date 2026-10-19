@@ -377,7 +377,7 @@ export default function Dashboard() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-              {isEvent ? `Welcome to ${user.college.name}` : `Welcome back, ${user?.name?.split(" ")[0]}`}
+              {isEvent ? `Welcome to ${user?.college?.name || "Event"}` : `Welcome back, ${user?.name ? user.name.split(" ")[0] : "Student"}`}
             </h1>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
               {liveCount ? (
@@ -404,6 +404,19 @@ export default function Dashboard() {
             </Button>
           </div>
         </div>
+
+        {/* Query error alert */}
+        {error && (
+          <div className="rounded-xl border border-rose-200 bg-rose-50/80 p-4 mb-6 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300 flex items-center justify-between shadow-sm">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-rose-600 flex-shrink-0" />
+              <span>{error.message || "Failed to load dashboard data. Please verify your connection."}</span>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => refetch()} className="border-rose-300 dark:border-rose-800 text-xs">
+              Retry
+            </Button>
+          </div>
+        )}
 
         {/* Statistics Cards */}
         {data?.stats && (
