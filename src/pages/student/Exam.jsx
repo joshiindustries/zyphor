@@ -144,7 +144,66 @@ export default function Exam() {
     }
   }, [hdr, finish, handleConflict]);
 
-  /* ── Handler functions for child components (must be before early returns) ───────── */
+  /* ── Saving answers (defined before handlers that reference them) ─ */
+  const saveMcq = useCallback((itemId, next) => {
+    cancelRetry(`mcq:${itemId}`);
+    setSaveStatus("saving");
+    setSaveLabel("Saving…");
+    savingRef.current = savingRef.current
+      .then(() => examApi("PUT", `/mcq/${itemId}`,
+        { selected: next.selected, marked_for_review: next.review }))
+      .then(() => {
+        setSaveStatus("saved");
+        setSaveLabel("Saved " + new Date().toLocaleTimeString());
+      })
+      .catch((err) => {
+        if (err.status !== 409) {
+          setSaveStatus("retrying");
+          setSaveLabel("Not saved · reconnect to retry");
+          toast("Couldn't save your answer: " + err.message + ". It will retry.", "error");
+          retryLater(`mcq:${itemId}`, () => saveMcq(itemId, next));
+        }
+      });
+  }, [examApi, toast, retryLater, cancelRetry]);
+
+  const saveCode = useCallback((force) => {
+    const { paper: p, index: i, code: c } = R.current;
+    const item = p?.items[i];
+    if (!item || item.type !== "coding" || finishedRef.current) return savingRef.current;
+    const st = c[item.item_id];
+    if (!st || (!st.dirty && !force)) return savingRef.current;
+
+    setCode((prev) => ({ ...prev, [item.item_id]: { ...prev[item.item_id], dirty: false } }));
+    const body = { language: st.language, code: st.drafts[st.language] || "" };
+    setSaveStatus("saving");
+    setSaveLabel("Saving…");
+    savingRef.current = savingRef.current
+      .then(() => examApi("PUT", `/code/${item.item_id}`, body))
+      .then(() => {
+        setSaveStatus("saved");
+        setSaveLabel("Saved " + new Date().toLocaleTimeString());
+      })
+      .catch((err) => {
+        setCode((prev) => ({ ...prev, [item.item_id]: { ...prev[item.item_id], dirty: true } }));
+        setSaveStatus("retrying");
+        setSaveLabel("Not saved");
+        if (err.status !== 409) retryLater(`code:${item.item_id}`, () => saveCode(false));
+      });
+    return savingRef.current;
+  }, [examApi, retryLater]);
+
+  /* ── Navigation (defined before handlers that reference it) ─────── */
+  const go = useCallback((next) => {
+    const items = R.current.paper?.items || [];
+    const clamped = Math.max(0, Math.min(items.length - 1, next));
+    saveCode(false);
+    setIndex(clamped);
+    if (items[clamped]) {
+      setVisited((v) => new Set(v).add(items[clamped].item_id));
+    }
+  }, [saveCode]);
+
+  /* ── Handler functions for child components ──────────────────────── */
   const handleMcqChange = useCallback((item, optionId, checked, isMulti) => {
     const prev = mcq[item.item_id] || { selected: [], review: false };
     const selected = isMulti
@@ -321,54 +380,6 @@ export default function Exam() {
     }
   }, [examId, info]);
 
-  /* ── Saving answers ──────────────────────────────────────────────── */
-  const saveMcq = useCallback((itemId, next) => {
-    cancelRetry(`mcq:${itemId}`);
-    setSaveStatus("saving");
-    setSaveLabel("Saving…");
-    savingRef.current = savingRef.current
-      .then(() => examApi("PUT", `/mcq/${itemId}`,
-        { selected: next.selected, marked_for_review: next.review }))
-      .then(() => {
-        setSaveStatus("saved");
-        setSaveLabel("Saved " + new Date().toLocaleTimeString());
-      })
-      .catch((err) => {
-        if (err.status !== 409) {
-          setSaveStatus("retrying");
-          setSaveLabel("Not saved · reconnect to retry");
-          toast("Couldn't save your answer: " + err.message + ". It will retry.", "error");
-          retryLater(`mcq:${itemId}`, () => saveMcq(itemId, next));
-        }
-      });
-  }, [examApi, toast, retryLater, cancelRetry]);
-
-  const saveCode = useCallback((force) => {
-    const { paper: p, index: i, code: c } = R.current;
-    const item = p?.items[i];
-    if (!item || item.type !== "coding" || finishedRef.current) return savingRef.current;
-    const st = c[item.item_id];
-    if (!st || (!st.dirty && !force)) return savingRef.current;
-
-    setCode((prev) => ({ ...prev, [item.item_id]: { ...prev[item.item_id], dirty: false } }));
-    const body = { language: st.language, code: st.drafts[st.language] || "" };
-    setSaveStatus("saving");
-    setSaveLabel("Saving…");
-    savingRef.current = savingRef.current
-      .then(() => examApi("PUT", `/code/${item.item_id}`, body))
-      .then(() => {
-        setSaveStatus("saved");
-        setSaveLabel("Saved " + new Date().toLocaleTimeString());
-      })
-      .catch((err) => {
-        setCode((prev) => ({ ...prev, [item.item_id]: { ...prev[item.item_id], dirty: true } }));
-        setSaveStatus("retrying");
-        setSaveLabel("Not saved");
-        if (err.status !== 409) retryLater(`code:${item.item_id}`, () => saveCode(false));
-      });
-    return savingRef.current;
-  }, [examApi, retryLater]);
-
   /* ── Heartbeat ───────────────────────────────────────────────────── */
   const heartbeat = useCallback(async () => {
     if (finishedRef.current) return;
@@ -487,14 +498,6 @@ export default function Exam() {
 
   useEffect(() => () => { document.body.classList.remove("exam-mode", "no-select"); }, []);
 
-  /* ── Navigation ──────────────────────────────────────────────────── */
-  const go = useCallback((next) => {
-    const items = R.current.paper.items;
-    const clamped = Math.max(0, Math.min(items.length - 1, next));
-    saveCode(false);
-    setIndex(clamped);
-    setVisited((v) => new Set(v).add(items[clamped].item_id));
-  }, [saveCode]);
 
   const item = paper?.items[index];
 
