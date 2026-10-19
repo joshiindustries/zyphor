@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../lib/api.js";
-import { toLocalInput } from "../../lib/format.js";
+import { fmtDate, toLocalInput } from "../../lib/format.js";
 import {
   Badge, Empty, Field, Loading, Modal, ModalButton, useConfirm, useToast,
 } from "../../components/ui.jsx";
