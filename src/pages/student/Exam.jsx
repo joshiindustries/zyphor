@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../../lib/api.js";
 import { useAuth } from "../../lib/auth.jsx";
 import { fmtDate, fmtDuration } from "../../lib/format.js";
-import { Badge, Loading, Markdown, Modal, OrgBrand, Spinner, useToast } from "../../components/ui.jsx";
+import { Loading, Markdown, OrgBrand, Spinner, useToast } from "../../components/ui.jsx";
 import MediaPipeMonitor from "./MediaPipeMonitor.jsx";
 import LeaderboardModal from "./LeaderboardModal.jsx";
 import {
